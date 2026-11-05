@@ -1,0 +1,139 @@
+<script setup>
+import { reactive } from 'vue'
+import { createVolunteerApplicationFilters } from '../../constants/listFilters'
+
+// 义工申请筛选条：收集条件后向上抛出 search / reset。
+const emit = defineEmits(['search', 'reset'])
+
+// 重置基准值，需与初始展示的查询条件保持一致。
+const form = reactive(createVolunteerApplicationFilters())
+const statusOptions = [
+  { label: '待审核', value: 'pending' },
+  { label: '已通过', value: 'approved' },
+  { label: '已拒绝', value: 'rejected' },
+]
+const postOptions = ['道场护持', '道会协助', '文宣服务', '线上服务']
+
+// 重置后直接抛出 reset，父级会用默认条件立即刷新列表。
+function resetForm() {
+  Object.assign(form, createVolunteerApplicationFilters())
+  emit('reset', { ...form })
+}
+</script>
+
+<template>
+  <div class="filter-card">
+    <div class="filter-field phone-field">
+      <span>联络手机</span>
+      <el-input v-model="form.phone" placeholder="请输入手机号" clearable @keyup.enter="emit('search', { ...form })" />
+    </div>
+    <div class="filter-field status-field">
+      <span>状态</span>
+      <el-select v-model="form.status" placeholder="全部" clearable>
+        <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
+    </div>
+    <div class="filter-field post-field">
+      <span>申请岗位</span>
+      <el-select v-model="form.post" placeholder="全部" clearable>
+        <el-option v-for="post in postOptions" :key="post" :label="post" :value="post" />
+      </el-select>
+    </div>
+    <div class="filter-field date-field">
+      <span>申请时间</span>
+      <el-date-picker v-model="form.startDate" type="date" value-format="YYYY-MM-DD" format="YYYY/MM/DD" placeholder="年/月/日" />
+      <em>至</em>
+      <el-date-picker v-model="form.endDate" type="date" value-format="YYYY-MM-DD" format="YYYY/MM/DD" placeholder="年/月/日" />
+    </div>
+    <div class="filter-actions">
+      <el-button class="search-button" @click="emit('search', { ...form })">查询</el-button>
+      <el-button @click="resetForm">重置</el-button>
+    </div>
+  </div>
+</template>
+
+<style scoped lang="less">
+.filter-card {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-md);
+  box-shadow: var(--admin-shadow-card);
+}
+
+.filter-field {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-text-regular);
+  font-size: 13px;
+  white-space: nowrap;
+
+  :deep(.el-input),
+  :deep(.el-select) {
+    width: 140px;
+  }
+
+  :deep(.el-input__wrapper),
+  :deep(.el-select__wrapper) {
+    min-height: 35px;
+    border-radius: var(--admin-radius-sm);
+    box-shadow: 0 0 0 1px var(--admin-border-strong) inset;
+  }
+}
+
+.phone-field :deep(.el-input) { width: 150px; }
+.post-field :deep(.el-select) { width: 130px; }
+.status-field :deep(.el-select) { width: 95px; }
+
+.date-field {
+  gap: 9px;
+
+  :deep(.el-date-editor) {
+    width: 140px;
+  }
+
+  em {
+    color: var(--admin-text-muted);
+    font-style: normal;
+  }
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: -2px;
+
+  .el-button {
+    height: 30px;
+    margin: 0;
+    padding: 0 12px;
+    border-radius: var(--admin-radius-sm);
+  }
+}
+
+.search-button {
+  color: var(--admin-text-inverse);
+  background: var(--admin-primary);
+  border-color: var(--admin-primary);
+
+  &:hover,
+  &:focus {
+    color: var(--admin-text-inverse);
+    background: var(--admin-primary-hover);
+    border-color: var(--admin-primary-hover);
+  }
+}
+
+@media (max-width: 1680px) {
+  .filter-card {
+    flex-wrap: wrap;
+    gap: 10px 18px;
+  }
+}
+</style>

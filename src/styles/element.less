@@ -1,0 +1,33 @@
+// Element Plus 全局主题映射集中维护，避免散落在业务组件中。
+:root {
+  --el-color-primary: var(--admin-primary);
+  --el-color-primary-light-3: var(--admin-primary-light-3);
+  --el-color-primary-light-5: var(--admin-primary-light-5);
+  --el-color-primary-light-7: var(--admin-primary-light-7);
+  --el-color-primary-light-8: var(--admin-primary-light-8);
+  --el-color-primary-light-9: var(--admin-primary-light-9);
+  --el-color-primary-dark-2: var(--admin-primary-dark);
+  --el-border-color: var(--admin-border);
+  --el-border-color-light: var(--admin-border-light);
+  --el-text-color-primary: var(--admin-text-primary);
+  --el-text-color-regular: var(--admin-text-regular);
+  --el-text-color-secondary: var(--admin-text-secondary);
+  --el-border-radius-base: var(--admin-radius-sm);
+}
+
+.el-button {
+  font-weight: 500;
+}
+
+.el-button:not(.is-text):not(.is-link) {
+  box-shadow: none;
+}
+
+.el-message-box {
+  border-top: 2px solid var(--admin-primary);
+}
+
+// 表格右侧固定操作列（label="操作" 所在列）：操作按钮较多时保持单行展示，不换行。
+.el-table-fixed-column--right .cell {
+  white-space: nowrap;
+}

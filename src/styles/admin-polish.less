@@ -1,0 +1,241 @@
+// 通用业务页视觉规范。范围限定在列表页，账号与角色页保留各自已完成的样式。
+#app main[class$='-list-page'] {
+  padding: 16px 26px 36px;
+
+  .page-heading {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 7px;
+    margin: 0 0 22px;
+    padding-left: 17px;
+
+    &::before {
+      position: absolute;
+      top: 4px;
+      bottom: 2px;
+      left: 0;
+      width: 4px;
+      content: '';
+      background: linear-gradient(180deg, var(--admin-primary), var(--admin-primary-light-7));
+      border-radius: var(--admin-radius-pill);
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--admin-text-primary);
+      font-size: 23px;
+      font-weight: 650;
+      line-height: 1.3;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--admin-text-secondary);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  }
+
+  .filter-card,
+  .status-card {
+    min-height: 80px;
+    flex-wrap: wrap;
+    gap: 12px 22px;
+    padding: 17px 22px;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border-light);
+    border-radius: 14px;
+    box-shadow: 0 6px 22px rgba(38, 68, 75, 0.04);
+  }
+
+  .filter-field {
+    gap: 10px;
+    color: var(--admin-text-regular);
+
+    .el-input__wrapper,
+    .el-select__wrapper {
+      min-height: 38px;
+      border-radius: 8px;
+      box-shadow: 0 0 0 1px var(--admin-border-strong) inset;
+      transition: box-shadow 0.18s ease;
+    }
+  }
+
+  .filter-actions {
+    gap: 10px;
+    margin-left: 0;
+
+    .el-button {
+      height: 38px;
+      margin: 0;
+      padding: 0 17px;
+      border-radius: 8px;
+    }
+
+    .search-button,
+    .el-button--primary {
+      box-shadow: 0 4px 10px rgba(47, 156, 143, 0.12);
+    }
+  }
+
+  .table-card,
+  .lamp-panel,
+  .deity-panel {
+    margin-top: 18px;
+    overflow: hidden;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border-light);
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(38, 68, 75, 0.045);
+  }
+
+  .table-toolbar,
+  .panel-toolbar {
+    min-height: 68px;
+    height: auto;
+    gap: 10px;
+    padding: 12px 22px;
+    color: var(--admin-text-regular);
+    border-bottom: 1px solid var(--admin-border-light);
+    background: linear-gradient(105deg, var(--admin-surface) 55%, var(--admin-primary-lighter));
+
+    > span { color: var(--admin-text-regular); }
+    b { color: var(--admin-primary); font-weight: 600; }
+
+    .el-button {
+      height: 36px;
+      margin: 0;
+      padding: 0 16px;
+      border-radius: 8px;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+
+      &:hover { transform: translateY(-1px); }
+    }
+
+    .add-button,
+    .batch-button,
+    .el-button--primary {
+      --el-button-text-color: var(--admin-text-inverse);
+      --el-button-hover-text-color: var(--admin-text-inverse);
+      --el-button-active-text-color: var(--admin-text-inverse);
+      color: var(--admin-text-inverse);
+      background: var(--admin-primary);
+      border-color: var(--admin-primary);
+      box-shadow: 0 4px 10px rgba(47, 156, 143, 0.14);
+
+      &:hover,
+      &:focus {
+        color: var(--admin-text-inverse);
+        background: var(--admin-primary-hover);
+        border-color: var(--admin-primary-hover);
+        box-shadow: 0 7px 14px rgba(47, 156, 143, 0.19);
+      }
+    }
+  }
+
+  .el-table {
+    --el-table-header-bg-color: #f7fafb;
+    --el-table-header-text-color: var(--admin-text-primary);
+    --el-table-row-hover-bg-color: var(--admin-row-hover);
+    font-size: 13px;
+
+    th.el-table__cell { height: 50px; font-weight: 600; }
+    td.el-table__cell { height: 55px; }
+    .cell { line-height: 1.5; }
+  }
+
+  .soft-tag { border-radius: 6px; font-weight: 500; }
+
+  .table-footer {
+    min-height: 62px;
+    height: auto;
+    padding: 12px 22px;
+    border-top: 1px solid var(--admin-border-light);
+
+    .el-pagination.is-background .btn-prev,
+    .el-pagination.is-background .btn-next,
+    .el-pagination.is-background .el-pager li {
+      border-radius: 7px;
+    }
+  }
+
+  .lamp-grid,
+  .deity-grid {
+    gap: 18px;
+    padding: 22px;
+  }
+
+  .lamp-card,
+  .deity-card {
+    border-color: var(--admin-border-light);
+    border-radius: 11px;
+    box-shadow: 0 3px 12px rgba(38, 68, 75, 0.035);
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      border-color: var(--admin-primary-light-7);
+      box-shadow: 0 9px 22px rgba(38, 68, 75, 0.09);
+    }
+  }
+}
+
+// 弹窗被 Element Plus 传送到 body，不能依赖列表页祖先选择器。
+.el-dialog:not(.account-dialog):not(.role-dialog):not(.role-view-dialog) {
+  max-width: calc(100vw - 32px);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  margin-top: 4vh !important;
+  overflow: hidden;
+  border: 1px solid var(--admin-border-light);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(35, 54, 66, 0.16);
+
+  .el-dialog__header {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 20px 26px;
+    border-bottom: 1px solid var(--admin-border-light);
+    background: linear-gradient(110deg, var(--admin-surface), var(--admin-primary-lighter));
+  }
+
+  .el-dialog__title { color: var(--admin-text-primary); font-size: 17px; font-weight: 650; }
+  .el-dialog__body { min-height: 0; overflow-y: auto; padding: 24px 26px 12px; }
+  .el-dialog__footer {
+    flex: 0 0 auto;
+    padding: 16px 26px;
+    border-top: 1px solid var(--admin-border-light);
+    background: var(--admin-surface-muted);
+
+    .el-button { min-width: 72px; height: 36px; border-radius: 8px; }
+    .save-button,
+    .approve-button {
+      color: var(--admin-text-inverse);
+      background: var(--admin-primary);
+      border-color: var(--admin-primary);
+    }
+  }
+}
+
+@media (max-width: 1280px) {
+  #app main[class$='-list-page'] .filter-card { gap: 12px 18px; }
+}
+
+@media (max-width: 768px) {
+  #app main[class$='-list-page'] {
+    padding: 18px 14px 28px;
+
+    .page-heading { margin-bottom: 18px; }
+    .filter-card,
+    .status-card { padding: 16px; }
+    .table-toolbar,
+    .panel-toolbar,
+    .table-footer { padding: 12px 16px; }
+    .lamp-grid,
+    .deity-grid { padding: 16px; }
+  }
+}

@@ -1,0 +1,17 @@
+// 演示用活动报名记录数据。
+// type: group 集体活动 / appointment 专场预约（与活动列表的类型对应）。
+// blessingDate 为祈福日期，未填写时为空串（列表展示 '—'）。
+export const initialRegistrations = [
+  { id: 'REG-0001', activityTitle: '中元节 · 天官赐福道会', activityTime: '2026-08-27 09:00 - 11:00', type: 'group', nickname: '十方善信3353', userPhone: '13810075621', name: '张慧敏', phone: '13810075621', companions: 2, blessingDate: '', wish: '阖家安康', registeredAt: '2026-08-20 22:14:11' },
+  { id: 'REG-0002', activityTitle: '北斗九皇诞 · 拜斗消灾延寿', activityTime: '2026-10-18 09:00 - 10:30', type: 'group', nickname: '十方善信5771', userPhone: '13010007741', name: '王志明', phone: '13010007741', companions: 1, blessingDate: '', wish: '学业进步', registeredAt: '2026-08-20 19:02:28' },
+  { id: 'REG-0003', activityTitle: '朔望祈福共修道会', activityTime: '每月 1/15 日 09:00 - 11:00', type: 'group', nickname: '十方善信6822', userPhone: '13210047790', name: '刘雅芬', phone: '15210147790', companions: 1, blessingDate: '2026-08-22', wish: '消灾保安泰', registeredAt: '2026-08-20 11:36:45' },
+  { id: 'REG-0004', activityTitle: '消灾祈福 · 顺天应时', activityTime: '预约制 · 提前 3 日', type: 'appointment', nickname: '十方善信4436', userPhone: '13010057715', name: '吴桂珍', phone: '13610057715', companions: 4, blessingDate: '2026-08-25', wish: '消灾解厄', registeredAt: '2026-08-19 16:48:02' },
+  { id: 'REG-0005', activityTitle: '专场祈福 · 个人及全家', activityTime: '预约制 · 提前 3 日', type: 'appointment', nickname: '十方善信9021', userPhone: '15810152360', name: '黄文博', phone: '15810152360', companions: 3, blessingDate: '2026-08-26', wish: '愿事业顺遂', registeredAt: '2026-08-18 10:25:19' },
+  { id: 'REG-0006', activityTitle: '中元节 · 地官赦罪道会', activityTime: '2026-08-27 09:00 - 11:00', type: 'group', nickname: '十方善信7738', userPhone: '13310029982', name: '孙丽平', phone: '13310029982', companions: 1, blessingDate: '', wish: '愿先人安息', registeredAt: '2026-08-18 21:19:36' },
+  { id: 'REG-0007', activityTitle: '北斗九皇诞 · 拜斗消灾延寿', activityTime: '2026-10-18 09:00 - 10:30', type: 'group', nickname: '十方善信6620', userPhone: '13010082210', name: '徐晓英', phone: '13010082210', companions: 2, blessingDate: '', wish: '愿消灾延寿', registeredAt: '2026-08-18 15:44:53' },
+  { id: 'REG-0008', activityTitle: '下元节 · 水官解厄道会', activityTime: '2026-11-23 09:00 - 11:00', type: 'group', nickname: '十方善信3392', userPhone: '18910200887', name: '郭美玲', phone: '18910200887', companions: 1, blessingDate: '', wish: '愿身体健康', registeredAt: '2026-08-17 09:26:10' },
+  { id: 'REG-0009', activityTitle: '中元节 · 天官赐福道会', activityTime: '2027-02-22 09:00 - 11:00', type: 'group', nickname: '十方善信3356', userPhone: '15210147790', name: '刘桂芳', phone: '15210147790', companions: 2, blessingDate: '', wish: '愿福泽绵长', registeredAt: '2026-08-16 14:08:52' },
+  { id: 'REG-0010', activityTitle: '专场祈福 · 个人及全家', activityTime: '预约制 · 提前 3 日', type: 'appointment', nickname: '十方善信3353', userPhone: '18010161234', name: '周德福', phone: '18010161234', companions: 1, blessingDate: '2026-08-30', wish: '愿身心安泰', registeredAt: '2026-08-15 18:30:07' },
+  { id: 'REG-0011', activityTitle: '腊八 · 施粥祈福道会', activityTime: '2027-01-26 09:00 - 11:00', type: 'group', nickname: '十方善信3318', userPhone: '13710062049', name: '宋建国', phone: '13710062049', companions: 3, blessingDate: '', wish: '愿广结善缘', registeredAt: '2026-08-14 09:11:26' },
+  { id: 'REG-0012', activityTitle: '下元节 · 水官解厄道会', activityTime: '2026-11-23 09:00 - 11:00', type: 'group', nickname: '十方善信3271', userPhone: '15110136889', name: '高秀兰', phone: '15110136889', companions: 1, blessingDate: '', wish: '愿解厄消灾', registeredAt: '2026-08-13 20:45:33' },
+]
