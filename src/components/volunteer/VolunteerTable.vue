@@ -1,16 +1,20 @@
 <script setup>
-import { View } from '@element-plus/icons-vue'
+import { CircleClose, RefreshRight, View } from '@element-plus/icons-vue'
 import ActionLink from '../common/ActionLink.vue'
 
 defineProps({
   volunteers: { type: Array, required: true },
   total: { type: Number, default: 0 },
   currentPage: { type: Number, default: 1 },
+  // 正在执行禁止/恢复请求的行 id，用于按钮 loading 态。
+  togglingId: { type: [Number, String], default: null },
 })
 
-// 事件说明：detail 打开详情弹窗，page-change 由父级切换分页。
-// 义工列表只包含审核通过（status=2）的义工，接口没有「禁止参加」状态位与原因字段，故不提供切换操作。
-const emit = defineEmits(['selection-change', 'detail', 'page-change'])
+// 事件说明：detail 打开详情弹窗，toggle-ban 切换「禁止参加 / 恢复参加」，page-change 由父级切换分页。
+const emit = defineEmits(['selection-change', 'detail', 'toggle-ban', 'page-change'])
+
+// 状态展示字典：normal 正常 / banned 禁止参加。
+const statusText = { normal: '正常', banned: '禁止参加' }
 </script>
 
 <template>
@@ -18,18 +22,38 @@ const emit = defineEmits(['selection-change', 'detail', 'page-change'])
   <div class="table-block">
     <el-table class="volunteer-table" border :data="volunteers" row-key="id" @selection-change="emit('selection-change', $event)">
       <el-table-column type="selection" width="42" />
-      <el-table-column prop="name" label="善信姓名" min-width="110" />
-      <el-table-column prop="phone" label="联络手机" min-width="130" />
-      <el-table-column prop="post" label="申请岗位" min-width="100" />
+      <el-table-column prop="name" label="善信姓名" min-width="100" />
+      <el-table-column prop="phone" label="联络手机" min-width="125" />
+      <el-table-column prop="post" label="申请岗位" min-width="95" />
+      <el-table-column prop="availableTime" label="可服务时间" min-width="90" />
+      <el-table-column prop="joinType" label="加入类型" min-width="90" />
       <el-table-column prop="joinedAt" label="加入时间" min-width="165" />
-      <el-table-column prop="declaration" label="申请留言" min-width="220" show-overflow-tooltip>
+      <el-table-column label="状态" min-width="120">
         <template #default="{ row }">
-          {{ row.declaration || '—' }}
+          <div class="status-cell">
+            <span :class="['status-tag', row.status]">{{ statusText[row.status] }}</span>
+            <span v-if="row.status === 'banned' && row.banReason" class="ban-reason">禁止原因：{{ row.banReason }}</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="95" fixed="right">
+      <el-table-column label="操作" width="170" fixed="right">
         <template #default="{ row }">
           <ActionLink :icon="View" text="详情" @click="emit('detail', row)" />
+          <ActionLink
+            v-if="row.status === 'normal'"
+            :icon="CircleClose"
+            text="禁止参加"
+            danger
+            :disabled="row.id === togglingId"
+            @click="emit('toggle-ban', row)"
+          />
+          <ActionLink
+            v-else
+            :icon="RefreshRight"
+            text="恢复参加"
+            :disabled="row.id === togglingId"
+            @click="emit('toggle-ban', row)"
+          />
         </template>
       </el-table-column>
     </el-table>
@@ -70,6 +94,33 @@ const emit = defineEmits(['selection-change', 'detail', 'page-change'])
     height: 52px;
     padding: 4px 0;
   }
+}
+
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.status-tag {
+  display: inline-flex;
+  min-width: 44px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: var(--admin-radius-sm);
+
+  &.normal { color: var(--admin-success); background: var(--admin-success-light); }
+  &.banned { color: var(--admin-danger); background: var(--admin-danger-light); }
+}
+
+.ban-reason {
+  color: var(--admin-danger);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .table-footer {

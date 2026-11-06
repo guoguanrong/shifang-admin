@@ -5,15 +5,20 @@ import { reactive } from 'vue'
 const emit = defineEmits(['search', 'reset'])
 
 // 重置基准值，需与初始展示的查询条件保持一致。
-// 义工列表固定只拉审核通过（status=2）的义工，接口无其他状态位，因此不再提供状态筛选。
+// 状态筛选：全部时不传 status（前端过滤 2 正常 / 4 禁止参加），选中时走服务端单值精确查询。
 const defaultForm = {
   name: '',
   phone: '',
   post: '',
+  status: '',
 }
 
 const form = reactive({ ...defaultForm })
 const postOptions = ['道场护持', '道会协助', '文宣服务', '线上服务']
+const statusOptions = [
+  { label: '正常', value: 'normal' },
+  { label: '禁止参加', value: 'banned' },
+]
 
 // 重置后直接抛出 reset，父级会用默认条件立即刷新列表。
 function resetForm() {
@@ -36,6 +41,12 @@ function resetForm() {
       <span>申请岗位</span>
       <el-select v-model="form.post" placeholder="全部" clearable>
         <el-option v-for="post in postOptions" :key="post" :label="post" :value="post" />
+      </el-select>
+    </div>
+    <div class="filter-field status-field">
+      <span>状态</span>
+      <el-select v-model="form.status" placeholder="全部" clearable>
+        <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
     </div>
     <div class="filter-actions">

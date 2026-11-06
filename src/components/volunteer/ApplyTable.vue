@@ -11,11 +11,12 @@ defineProps({
 // 事件说明：review 打开审核弹窗，page-change 由父级切换分页。
 const emit = defineEmits(['selection-change', 'review', 'page-change'])
 
-// 状态字典：pending 待审核 / approved 已通过 / rejected 已拒绝。
+// 状态字典：pending 待审核 / approved 已通过 / rejected 已拒绝 / banned 禁止参加（仅展示，审核入口只对 pending 开放）。
 const statusText = {
   pending: '待审核',
   approved: '已通过',
   rejected: '已拒绝',
+  banned: '禁止参加',
 }
 </script>
 
@@ -40,6 +41,7 @@ const statusText = {
           <div class="status-cell">
             <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
             <span v-if="row.status === 'rejected' && row.rejectReason" class="reject-reason">拒绝理由：{{ row.rejectReason }}</span>
+            <span v-else-if="row.status === 'banned' && row.banReason" class="reject-reason">禁止原因：{{ row.banReason }}</span>
           </div>
         </template>
       </el-table-column>
@@ -101,6 +103,7 @@ const statusText = {
   &.pending { color: var(--admin-warning); background: var(--admin-warning-light); }
   &.approved { color: var(--admin-success); background: var(--admin-success-light); }
   &.rejected { color: var(--admin-danger); background: var(--admin-danger-light); }
+  &.banned { color: var(--admin-text-secondary); background: var(--admin-surface-muted); }
 }
 
 .status-cell {

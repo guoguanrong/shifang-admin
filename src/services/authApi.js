@@ -7,3 +7,8 @@ export function login(data) {
     grantType: GRANT_TYPE,
   })
 }
+
+// 注销登录：让服务端使 token 失效；失败由调用方忽略，本地会话照常清理。
+export function logout() {
+  return http.post('/auth/logout')
+}

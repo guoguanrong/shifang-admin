@@ -52,5 +52,9 @@ export const initialMessages = [
   },
 ]
 
-// 寄语分类下拉选项（与 mock 数据中的分类保持一致）。
-export const messageCategoryOptions = ['知名人士', '道内人士', '其他重要人士']
+// 寄语分类下拉选项（与后端 /wishes/list 真实数据的分类体系保持一致）。
+export const messageCategoryOptions = [
+  '祈愿·平安', '祈愿·健康', '祈愿·事业', '祈愿·学业', '祈愿·财运',
+  '祈愿·家宅', '祈愿·化太岁', '祈愿·添禄', '祈愿·破障',
+  '感恩·还愿', '自勉·修心', '追思·荐福',
+]

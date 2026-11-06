@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useTabsStore } from '../../stores/tabs'
+import { logout as logoutApi } from '../../services/authApi'
 import AppSidebar from './AppSidebar.vue'
 
 const authStore = useAuthStore()
@@ -67,8 +68,13 @@ async function handleTabCommand(command) {
   if (targetPath && targetPath !== route.fullPath) await router.push(targetPath)
 }
 
-// 退出登录：清会话 → 清页签 → 回登录页。
+// 退出登录：先让服务端 token 失效（失败不阻塞），再清会话 → 清页签 → 回登录页。
 async function logout() {
+  try {
+    await logoutApi()
+  } catch {
+    // 服务端注销失败（如网络异常）时仍继续本地登出。
+  }
   authStore.logout()
   tabsStore.resetTabs()
   await router.replace('/login')

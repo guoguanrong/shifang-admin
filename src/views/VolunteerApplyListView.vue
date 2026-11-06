@@ -8,14 +8,15 @@ import { getVolunteerList, updateVolunteer } from '../services/businessApi'
 import { downloadCsv } from '../utils/csv'
 
 const PAGE_SIZE = 10
-// 状态字典：接口 1.待审核 / 2.审核通过 / 3.拒绝，页面内部沿用 pending / approved / rejected。
+// 状态字典：接口 1.待审核 / 2.审核通过 / 3.拒绝 / 4.禁止参加，页面内部沿用 pending / approved / rejected。
 const statusText = {
   pending: '待审核',
   approved: '已通过',
   rejected: '已拒绝',
+  banned: '禁止参加',
 }
 const statusValue = { pending: 1, approved: 2, rejected: 3 }
-const statusKey = { 1: 'pending', 2: 'approved', 3: 'rejected' }
+const statusKey = { 1: 'pending', 2: 'approved', 3: 'rejected', 4: 'banned' }
 
 const applications = ref([])
 const filters = ref(createVolunteerApplicationFilters())
@@ -26,7 +27,7 @@ const pendingCount = ref(0)
 const loading = ref(false)
 const reviewing = ref(false)
 
-// VolunteerVo → 表格行：申请留言取 remark，可服务时间取 serviceTime，拒绝原因取 refuseReason。
+// VolunteerVo → 表格行：申请留言取 remark，可服务时间取 serviceTime，拒绝/禁止原因分别取 refuseReason / banReason。
 function mapApplication(item) {
   return {
     id: item.id,
@@ -38,6 +39,7 @@ function mapApplication(item) {
     declaration: item.remark || '',
     status: statusKey[Number(item.status)] || 'pending',
     rejectReason: item.refuseReason || '',
+    banReason: item.banReason || '',
   }
 }
 
@@ -59,7 +61,9 @@ async function loadApplications() {
     const payload = await getVolunteerList(params)
     const result = payload?.data ?? payload
     const list = Array.isArray(result) ? result : result?.list
-    applications.value = Array.isArray(list) ? list.map(mapApplication) : []
+    // 排除「禁止参加」(status=4)：属于义工列表的范畴，避免兜底成待审核出现审核入口。
+    // 接口 status 暂不支持多值，无法在查询侧排除，等后端支持后改为传参过滤。
+    applications.value = Array.isArray(list) ? list.map(mapApplication).filter((row) => row.status !== 'banned') : []
     const responseTotal = Number(result?.totalRow)
     total.value = Number.isFinite(responseTotal) ? responseTotal : applications.value.length
     const responsePage = Number(result?.currentPage)

@@ -1,14 +1,19 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { RefreshRight, CircleClose } from '@element-plus/icons-vue'
 import VolunteerFilterBar from '../components/volunteer/VolunteerFilterBar.vue'
 import VolunteerTable from '../components/volunteer/VolunteerTable.vue'
-import { getVolunteerList, saveVolunteer } from '../services/businessApi'
+import { getVolunteerList, saveVolunteer, updateVolunteer } from '../services/businessApi'
 import { downloadCsv } from '../utils/csv'
 
 const PAGE_SIZE = 10
-// 义工列表 = 审核通过的义工申请，接口状态字典：1.待审核 / 2.审核通过 / 3.拒绝。
-const APPROVED_STATUS = 2
+// 义工状态字典：接口 1.待审核 / 2.审核通过(正常) / 3.拒绝 / 4.禁止参加；本页只呈现 2 与 4。
+const statusValue = { normal: 2, banned: 4 }
+const statusKey = { 2: 'normal', 4: 'banned' }
+const statusText = { normal: '正常', banned: '禁止参加' }
+// 加入类型：1.自主申请（官网报名）/ 2.后台添加。
+const typeText = { 1: '自主申请', 2: '人工新增' }
 const postOptions = ['道场护持', '道会协助', '文宣服务', '线上服务']
 const availableTimeOptions = ['均可', '周末', '节假日']
 
@@ -19,8 +24,10 @@ const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const saving = ref(false)
+const togglingId = ref(null)
 
 // VolunteerVo → 表格行：姓名 username、岗位 applyPost、可服务时间 serviceTime、加入时间 createTime、留言 remark。
+// 非 2/4 的状态（待审核/已拒绝）映射为 null，由 loadVolunteers 过滤。
 function mapVolunteer(item) {
   return {
     id: item.id,
@@ -28,19 +35,23 @@ function mapVolunteer(item) {
     phone: item.phone || '—',
     post: item.applyPost || '—',
     availableTime: item.serviceTime || '—',
+    joinType: typeText[Number(item.type)] || '—',
     joinedAt: item.createTime || '—',
     declaration: item.remark || '',
+    status: statusKey[Number(item.status)] || null,
+    banReason: item.banReason || '',
   }
 }
 
-// 拉取义工名单：只取审核通过的记录；姓名走 searchKey，手机号右模糊，岗位精确匹配。
+// 拉取义工名单：正常 + 禁止参加；姓名走 searchKey，手机号右模糊，岗位精确匹配。
+// 接口 status 暂不支持多值：选中状态时走服务端单值查询，「全部」时拉全量后前端过滤（分页计数以接口为准）。
 async function loadVolunteers() {
   loading.value = true
-  const { name, phone, post } = filters.value
+  const { name, phone, post, status } = filters.value
   const params = {
     page: currentPage.value,
     pageSize: PAGE_SIZE,
-    status: APPROVED_STATUS,
+    status: status ? statusValue[status] : undefined,
     searchKey: (name || '').trim() || undefined,
     phone: (phone || '').trim() || undefined,
     applyPost: post || undefined,
@@ -50,9 +61,11 @@ async function loadVolunteers() {
     const payload = await getVolunteerList(params)
     const result = payload?.data ?? payload
     const list = Array.isArray(result) ? result : result?.list
-    volunteers.value = Array.isArray(list) ? list.map(mapVolunteer) : []
+    let rows = Array.isArray(list) ? list.map(mapVolunteer) : []
+    if (!status) rows = rows.filter((row) => row.status === 'normal' || row.status === 'banned')
+    volunteers.value = rows
     const responseTotal = Number(result?.totalRow)
-    total.value = Number.isFinite(responseTotal) ? responseTotal : volunteers.value.length
+    total.value = Number.isFinite(responseTotal) ? responseTotal : rows.length
     const responsePage = Number(result?.currentPage)
     if (Number.isFinite(responsePage) && responsePage > 0) currentPage.value = responsePage
     selection.value = []
@@ -118,7 +131,7 @@ function openAdd() {
   addVisible.value = true
 }
 
-// 保存并录入：调用新增义工接口，直接以审核通过状态入册（本页语义就是已通过审核的义工）。
+// 保存并录入：调用新增义工接口，直接以正常状态入册（本页语义就是已通过审核的义工），后台添加 type=2。
 async function submitAdd() {
   if (saving.value) return
   try {
@@ -135,7 +148,8 @@ async function submitAdd() {
       applyPost: addForm.post,
       serviceTime: addForm.availableTime,
       remark: addForm.declaration.trim(),
-      status: APPROVED_STATUS,
+      status: statusValue.normal,
+      type: 2,
     })
     addVisible.value = false
     ElMessage.success('义工信息已录入')
@@ -148,16 +162,58 @@ async function submitAdd() {
   }
 }
 
+// 禁止参加：填写原因后置为 status=4；恢复参加：置回 status=2 并清空原因。
+async function toggleBan(volunteer) {
+  const banning = volunteer.status === 'normal'
+  try {
+    if (banning) {
+      const { value } = await ElMessageBox.prompt(
+        `确定禁止义工 ${volunteer.name} 参加活动吗？禁止后将无法报名道会。`,
+        '禁止参加',
+        {
+          confirmButtonText: '确定禁止',
+          cancelButtonText: '取消',
+          inputPlaceholder: '请输入禁止参加的原因',
+          inputPattern: /\S+/,
+          inputErrorMessage: '禁止原因不能为空',
+          type: 'warning',
+        },
+      )
+      togglingId.value = volunteer.id
+      await updateVolunteer({ id: volunteer.id, status: statusValue.banned, banReason: (value || '').trim() })
+      ElMessage.success(`已禁止 ${volunteer.name} 参加活动`)
+    } else {
+      await ElMessageBox.confirm(
+        `确定恢复义工 ${volunteer.name} 参加活动吗？恢复后可正常报名道会。`,
+        '恢复参加',
+        { confirmButtonText: '确定恢复', cancelButtonText: '取消', type: 'warning' },
+      )
+      togglingId.value = volunteer.id
+      await updateVolunteer({ id: volunteer.id, status: statusValue.normal, banReason: '' })
+      ElMessage.success(`已恢复 ${volunteer.name} 参加活动`)
+    }
+    await loadVolunteers()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error(error.userMessage || error.message || `${banning ? '禁止' : '恢复'}操作失败`)
+  } finally {
+    togglingId.value = null
+  }
+}
+
 // 导出名单：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
 function exportVolunteers() {
   const exportRows = selection.value.length ? selection.value : volunteers.value
-  const headers = ['善信姓名', '联络手机', '申请岗位', '可服务时间', '加入时间', '申请留言']
+  const headers = ['善信姓名', '联络手机', '申请岗位', '可服务时间', '加入类型', '加入时间', '状态', '禁止原因', '申请留言']
   const lines = exportRows.map((item) => [
     item.name,
     item.phone,
     item.post,
     item.availableTime,
+    item.joinType,
     item.joinedAt,
+    statusText[item.status],
+    item.banReason || '—',
     item.declaration || '—',
   ])
   downloadCsv('义工名单.csv', headers, lines)
@@ -185,8 +241,10 @@ function exportVolunteers() {
         :volunteers="volunteers"
         :total="total"
         :current-page="currentPage"
+        :toggling-id="togglingId"
         @selection-change="selection = $event"
         @detail="openDetail"
+        @toggle-ban="toggleBan"
         @page-change="changePage"
       />
     </section>
@@ -198,7 +256,9 @@ function exportVolunteers() {
         <el-descriptions-item label="联络手机">{{ currentVolunteer.phone }}</el-descriptions-item>
         <el-descriptions-item label="申请岗位">{{ currentVolunteer.post }}</el-descriptions-item>
         <el-descriptions-item label="可服务时间">{{ currentVolunteer.availableTime }}</el-descriptions-item>
+        <el-descriptions-item label="加入类型">{{ currentVolunteer.joinType }}</el-descriptions-item>
         <el-descriptions-item label="加入时间">{{ currentVolunteer.joinedAt }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ statusText[currentVolunteer.status] }}<template v-if="currentVolunteer.banReason">（{{ currentVolunteer.banReason }}）</template></el-descriptions-item>
         <el-descriptions-item label="申请留言">{{ currentVolunteer.declaration || '—' }}</el-descriptions-item>
       </el-descriptions>
       <template #footer>
