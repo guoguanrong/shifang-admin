@@ -88,104 +88,108 @@ function closePreview() {
 </script>
 
 <template>
-  <el-table class="message-table" border :data="messages" row-key="id">
-    <el-table-column label="寄语媒体" min-width="90">
-      <template #default="{ row }">
-        <span
-          v-if="isVideoMessage(row)"
-          class="media-thumb video-thumb"
-          title="点击预览视频"
-          @click="openPreview(row)"
-        >
-          <el-icon :size="20"><VideoPlay /></el-icon>
-        </span>
-        <el-image
-          v-else-if="isImageMessage(row)"
-          :src="getFirstImageUrl(row)"
-          fit="cover"
-          class="media-thumb"
-          title="点击预览图片"
-          @click="openPreview(row)"
-        >
-          <template #error>
-            <span class="media-thumb-fallback">图</span>
-          </template>
-        </el-image>
-        <span v-else class="media-thumb empty-thumb">—</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="分类" min-width="110">
-      <template #default="{ row }">
-        <span :class="['soft-tag', categoryClass(row.category)]">{{ row.category }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="title" label="寄语标题" min-width="130" show-overflow-tooltip />
-    <el-table-column prop="content" label="寄语内容" min-width="220" show-overflow-tooltip />
-    <el-table-column prop="detail" label="详细内容" min-width="280" show-overflow-tooltip />
-    <el-table-column prop="createdAt" label="新增时间" min-width="165" />
-    <el-table-column label="展示状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="230" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-        <ActionLink
-          v-if="row.status === 'shown'"
-          :icon="Hide"
-          text="隐藏"
-          @click="emit('toggle', row)"
-        />
-        <template v-else>
-          <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
-          <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="message-table" border :data="messages" row-key="id">
+      <el-table-column label="寄语媒体" min-width="90">
+        <template #default="{ row }">
+          <span
+            v-if="isVideoMessage(row)"
+            class="media-thumb video-thumb"
+            title="点击预览视频"
+            @click="openPreview(row)"
+          >
+            <el-icon :size="20"><VideoPlay /></el-icon>
+          </span>
+          <el-image
+            v-else-if="isImageMessage(row)"
+            :src="getFirstImageUrl(row)"
+            fit="cover"
+            class="media-thumb"
+            title="点击预览图片"
+            @click="openPreview(row)"
+          >
+            <template #error>
+              <span class="media-thumb-fallback">图</span>
+            </template>
+          </el-image>
+          <span v-else class="media-thumb empty-thumb">—</span>
         </template>
-      </template>
-    </el-table-column>
-  </el-table>
+      </el-table-column>
+      <el-table-column label="分类" min-width="110">
+        <template #default="{ row }">
+          <span :class="['soft-tag', categoryClass(row.category)]">{{ row.category }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="title" label="寄语标题" min-width="130" show-overflow-tooltip />
+      <el-table-column prop="content" label="寄语内容" min-width="220" show-overflow-tooltip />
+      <el-table-column prop="detail" label="详细内容" min-width="280" show-overflow-tooltip />
+      <el-table-column prop="createdAt" label="新增时间" min-width="165" />
+      <el-table-column label="展示状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="230" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+          <ActionLink
+            v-if="row.status === 'shown'"
+            :icon="Hide"
+            text="隐藏"
+            @click="emit('toggle', row)"
+          />
+          <template v-else>
+            <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
+            <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+          </template>
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
-
-  <el-dialog
-    v-model="previewVisible"
-    :title="previewTitle"
-    width="680px"
-    align-center
-    destroy-on-close
-    @closed="closePreview"
-  >
-    <video
-      v-if="previewIsVideo"
-      :key="previewRow?.videoUrl"
-      :src="previewRow?.videoUrl"
-      controls
-      class="preview-video"
-    />
-    <div v-else class="preview-images">
-      <el-image
-        v-for="(url, index) in previewImageUrls"
-        :key="`${url}-${index}`"
-        :src="url"
-        :preview-src-list="previewImageUrls"
-        :initial-index="index"
-        fit="cover"
-        preview-teleported
-        class="preview-image"
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
       />
-    </div>
-  </el-dialog>
+    </footer>
+
+    <el-dialog
+      v-model="previewVisible"
+      :title="previewTitle"
+      width="680px"
+      align-center
+      destroy-on-close
+      @closed="closePreview"
+    >
+      <video
+        v-if="previewIsVideo"
+        :key="previewRow?.videoUrl"
+        :src="previewRow?.videoUrl"
+        controls
+        class="preview-video"
+      />
+      <div v-else class="preview-images">
+        <el-image
+          v-for="(url, index) in previewImageUrls"
+          :key="`${url}-${index}`"
+          :src="url"
+          :preview-src-list="previewImageUrls"
+          :initial-index="index"
+          fit="cover"
+          preview-teleported
+          class="preview-image"
+        />
+      </div>
+    </el-dialog>
+
+  </div>
 </template>
 
 <style scoped lang="less">

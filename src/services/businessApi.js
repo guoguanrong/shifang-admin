@@ -253,3 +253,29 @@ export function updateActivity(data) {
 export function deleteActivityById(id) {
   return http.post(`/activity/delete/${id}`)
 }
+
+// 活动报名记录：/activityRegister/list 入参 {searchKey, status, startTime, endTime, page, pageSize, mobile}，
+// 返回 {list, currentPage, totalPage, totalRow}，每条记录内嵌 activity（ActivityVo）。
+export function getActivityRegisterList(params) {
+  return http.post('/activityRegister/list', params)
+}
+
+export function getActivityRegisterById(id) {
+  return http.get(`/activityRegister/get/${id}`)
+}
+
+export function saveActivityRegister(data) {
+  return http.post('/activityRegister/save', data)
+}
+
+export function updateActivityRegister(data) {
+  return http.post('/activityRegister/update', data)
+}
+
+export function deleteActivityRegisterById(id) {
+  return http.post(`/activityRegister/delete/${id}`)
+}
+
+export function getSelfActivityRegisterList(params) {
+  return http.post('/activityRegister/selfActivityList', params)
+}

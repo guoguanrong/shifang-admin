@@ -1,73 +1,66 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import PermissionTree from './PermissionTree.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
+  // role: SysRoleVo 映射行 { id, name, key, menuIdList }
   role: { type: Object, default: null },
-  roles: { type: Array, required: true },
-  groups: { type: Array, required: true },
+  // menus: 后端菜单树（SysMenuVo，label 取 title），按钮节点为 type=3 的叶子
+  menus: { type: Array, required: true },
 })
 const emit = defineEmits(['update:modelValue', 'save'])
 const formRef = ref(null)
-const form = reactive({ name: '', parentId: '', permissions: [] })
+const treeRef = ref(null)
+const form = reactive({ name: '', key: '' })
 
 const rules = {
   name: [
     { required: true, whitespace: true, message: '请输入角色名称', trigger: 'blur' },
     { max: 30, message: '角色名称不能超过 30 个字符', trigger: 'blur' },
-    { validator: (_rule, value, callback) => {
-      if (props.roles.some((role) => role.id !== props.role?.id && role.name.trim().toLowerCase() === value.trim().toLowerCase())) callback(new Error('角色名称已存在'))
-      else callback()
-    }, trigger: 'blur' },
+  ],
+  key: [
+    { required: true, whitespace: true, message: '请输入权限字符', trigger: 'blur' },
+    { max: 50, message: '权限字符不能超过 50 个字符', trigger: 'blur' },
   ],
 }
 
-const parentOptions = computed(() => {
-  const excluded = new Set(props.role ? [props.role.id] : [])
-  let changed = true
-  while (changed) {
-    changed = false
-    props.roles.forEach((role) => {
-      if (role.parentId && excluded.has(role.parentId) && !excluded.has(role.id)) {
-        excluded.add(role.id)
-        changed = true
-      }
+const treeProps = { label: 'title', children: 'children' }
+
+// 回显只勾叶子节点：父节点交给 el-tree 父子联动推导，
+// 否则 default-checked-keys 里的父节点会强制全选其子级。
+const checkedKeysOnOpen = computed(() => {
+  const leafIds = new Set()
+  const walk = (nodes) => {
+    nodes.forEach((node) => {
+      if (node.children?.length) walk(node.children)
+      else leafIds.add(node.id)
     })
   }
-  const available = props.roles.filter((role) => !excluded.has(role.id))
-  const byId = Object.fromEntries(available.map((role) => [role.id, { id: role.id, label: role.name, children: [] }]))
-  const roots = []
-  available.forEach((role) => {
-    if (role.parentId && byId[role.parentId]) byId[role.parentId].children.push(byId[role.id])
-    else roots.push(byId[role.id])
-  })
-  return roots
+  walk(props.menus)
+  return (props.role?.menuIdList || []).filter((id) => leafIds.has(id))
 })
 
 watch(() => props.modelValue, (visible) => {
   if (!visible) return
-  Object.assign(form, {
-    name: props.role?.name || '',
-    parentId: props.role?.parentId || '',
-    permissions: [...(props.role?.permissions || [])],
-  })
+  form.name = props.role?.name || ''
+  form.key = props.role?.key || ''
   formRef.value?.clearValidate()
 })
 
-async function submit() {
-  try {
-    await formRef.value.validate()
-  } catch {
-    return
-  }
-  if (!form.permissions.length) {
-    ElMessage.warning('请至少选择一项权限')
-    return
-  }
-  emit('save', { name: form.name.trim(), parentId: form.parentId || null, permissions: [...form.permissions] })
-  emit('update:modelValue', false)
+function submit() {
+  formRef.value.validate(async (valid) => {
+    if (!valid) return
+    const checked = treeRef.value?.getCheckedKeys() || []
+    const halfChecked = treeRef.value?.getHalfCheckedKeys() || []
+    const menuIdList = [...checked, ...halfChecked]
+    if (!checked.length) {
+      ElMessage.warning('请至少选择一项权限')
+      return
+    }
+    emit('save', { name: form.name.trim(), key: form.key.trim(), menuIdList })
+    emit('update:modelValue', false)
+  })
 }
 </script>
 
@@ -85,18 +78,19 @@ async function submit() {
       <el-form-item label="角色名称" prop="name">
         <el-input v-model="form.name" maxlength="30" placeholder="请输入角色名称" />
       </el-form-item>
-      <el-form-item label="上级角色">
-        <el-tree-select
-          v-model="form.parentId"
-          :data="parentOptions"
-          node-key="id"
-          check-strictly
-          clearable
-          placeholder="无上级角色"
-        />
+      <el-form-item label="权限字符" prop="key">
+        <el-input v-model="form.key" maxlength="50" placeholder="如 admin、operator，用于前端权限标识" />
       </el-form-item>
       <el-form-item label="权限配置" class="permission-field">
-        <PermissionTree v-model="form.permissions" :groups="groups" />
+        <el-tree
+          ref="treeRef"
+          :data="menus"
+          node-key="id"
+          :props="treeProps"
+          show-checkbox
+          default-expand-all
+          :default-checked-keys="checkedKeysOnOpen"
+        />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -130,10 +124,17 @@ async function submit() {
   .el-dialog__footer .el-button { min-width: 72px; height: 36px; border-radius: 8px; }
   .el-form-item { margin-bottom: 19px; }
   .el-form-item__label { padding-bottom: 8px; color: var(--admin-text-regular); font-size: 13px; font-weight: 600; }
-  .el-input__wrapper, .el-select__wrapper { min-height: 40px; border-radius: 8px; }
-  .el-select { width: 100%; }
+  .el-input__wrapper { min-height: 40px; border-radius: 8px; }
   .permission-field .el-form-item__content { display: block; }
-  .permission-tree { width: 100%; }
+  .permission-field .el-tree {
+    width: 100%;
+    max-height: 320px;
+    padding: 8px 4px;
+    overflow-y: auto;
+    background: var(--admin-surface-muted);
+    border: 1px solid var(--admin-border-light);
+    border-radius: 8px;
+  }
 
   @media (max-width: 580px) {
     .el-dialog__header { padding: 20px 22px; }

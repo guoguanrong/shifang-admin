@@ -61,7 +61,7 @@ function save() {
         @click="toggle(material)"
       >
         <i class="check-box" :class="{ checked: isSelected(material) }">✓</i>
-        <img v-if="material.picture" class="material-thumb" :src="material.picture" :alt="material.name" />
+        <img v-if="material.picture" v-media-preview="material.picture" class="material-thumb" :src="material.picture" :alt="material.name" />
         <span v-else class="material-thumb">图</span>
         <strong>{{ material.name }}</strong>
         <em>${{ material.price }} / {{ material.unit }}</em>

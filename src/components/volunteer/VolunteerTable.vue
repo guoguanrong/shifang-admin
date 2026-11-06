@@ -14,36 +14,40 @@ const emit = defineEmits(['selection-change', 'detail', 'page-change'])
 </script>
 
 <template>
-  <el-table class="volunteer-table" border :data="volunteers" row-key="id" @selection-change="emit('selection-change', $event)">
-    <el-table-column type="selection" width="42" />
-    <el-table-column prop="name" label="善信姓名" min-width="110" />
-    <el-table-column prop="phone" label="联络手机" min-width="130" />
-    <el-table-column prop="post" label="申请岗位" min-width="100" />
-    <el-table-column prop="joinedAt" label="加入时间" min-width="165" />
-    <el-table-column prop="declaration" label="申请留言" min-width="220" show-overflow-tooltip>
-      <template #default="{ row }">
-        {{ row.declaration || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="95" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="View" text="详情" @click="emit('detail', row)" />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="volunteer-table" border :data="volunteers" row-key="id" @selection-change="emit('selection-change', $event)">
+      <el-table-column type="selection" width="42" />
+      <el-table-column prop="name" label="善信姓名" min-width="110" />
+      <el-table-column prop="phone" label="联络手机" min-width="130" />
+      <el-table-column prop="post" label="申请岗位" min-width="100" />
+      <el-table-column prop="joinedAt" label="加入时间" min-width="165" />
+      <el-table-column prop="declaration" label="申请留言" min-width="220" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.declaration || '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="95" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="View" text="详情" @click="emit('detail', row)" />
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

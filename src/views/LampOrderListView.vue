@@ -148,7 +148,7 @@ function exportOrders() {
 
     <!-- 查看点灯预览：预览图由前台下单时生成，接口暂无订单图片更新能力 -->
     <el-dialog v-model="viewVisible" title="查看点灯预览" width="480px">
-      <img v-if="previewImage" :src="previewImage" class="view-preview" alt="点灯预览图" />
+      <img v-if="previewImage" v-media-preview="previewImage" :src="previewImage" class="view-preview" alt="点灯预览图" />
       <p v-else class="empty-tip">暂无点灯预览图（接口未提供订单预览图上传能力）</p>
       <template #footer>
         <el-button @click="viewVisible = false">关闭</el-button>

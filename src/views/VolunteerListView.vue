@@ -181,6 +181,7 @@ function exportVolunteers() {
       </div>
 
       <VolunteerTable
+        v-loading="loading"
         :volunteers="volunteers"
         :total="total"
         :current-page="currentPage"

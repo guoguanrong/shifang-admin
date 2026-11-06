@@ -43,9 +43,13 @@ async function loadActivities() {
     const result = payload?.data ?? payload
     activities.value = getList(payload).map(mapActivity)
     const responseTotal = Number(result?.totalRow)
-    total.value = Number.isFinite(responseTotal) ? responseTotal : activities.value.length
-    const responsePage = Number(result?.currentPage)
-    if (Number.isFinite(responsePage) && responsePage > 0) currentPage.value = responsePage
+    total.value = Number.isFinite(responseTotal) && responseTotal > 0 ? responseTotal : activities.value.length
+    // 只有请求页超出总页数时才回退页码；无条件回写会让不认 page 参数的后端导致翻页失效。
+    const totalPage = Number(result?.totalPage)
+    if (Number.isFinite(totalPage) && totalPage > 0 && currentPage.value > totalPage) {
+      const responsePage = Number(result?.currentPage)
+      currentPage.value = Number.isFinite(responsePage) && responsePage > 0 ? responsePage : totalPage
+    }
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '获取道会列表失败')
   } finally {
@@ -161,11 +165,27 @@ async function handleSave(payload) {
   const body = buildActivityPayload(payload)
 
   try {
-    if (isEdit) await updateActivity({ id: editingId.value, ...body })
-    else await saveActivity(body)
-    ElMessage.success(isEdit ? '道会已更新' : '道会已发布')
-    currentPage.value = 1
-    await loadActivities()
+    if (isEdit) {
+      // 接口的 null 表示「未设置」，而表单会回填默认值；只提交真正改动的字段，
+      // 避免打开编辑就保存把 status/day/startHour 等空值写成默认值。
+      const originalBody = currentActivity.value ? buildActivityPayload(currentActivity.value) : {}
+      const changes = Object.fromEntries(
+        Object.entries(body).filter(([key, value]) => !Object.is(value, originalBody[key])),
+      )
+      if (Object.keys(changes).length) {
+        await updateActivity({ id: editingId.value, ...changes })
+        currentPage.value = 1
+        await loadActivities()
+      }
+      ElMessage.success('道会已更新')
+    } else {
+      await saveActivity(body)
+      ElMessage.success('道会已发布')
+      currentPage.value = 1
+      await loadActivities()
+    }
+    // 保存失败时保留弹窗与已填内容，由父级在成功后统一关闭。
+    dialogVisible.value = false
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存道会失败')
   } finally {
@@ -204,6 +224,7 @@ async function handleSave(payload) {
     <ActivityFormDialog
       v-model="dialogVisible"
       :activity="currentActivity"
+      :saving="saving"
       @save="handleSave"
     />
   </main>

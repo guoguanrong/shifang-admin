@@ -18,61 +18,65 @@ function formatAmount(amount) {
 </script>
 
 <template>
-  <el-table class="donation-table" border :data="records" row-key="id" @selection-change="emit('selection-change', $event)">
-    <el-table-column type="selection" width="42" />
-    <el-table-column prop="orderNo" label="捐赠单号" min-width="130" />
-    <el-table-column label="用户" min-width="140">
-      <template #default="{ row }">
-        <div class="user-cell">
-          <strong>{{ row.nickname }}</strong>
-          <span>{{ row.userPhone }}</span>
-        </div>
-      </template>
-    </el-table-column>
-    <el-table-column prop="name" label="善信姓名" min-width="95" />
-    <el-table-column prop="phone" label="联络手机" min-width="125" />
-    <el-table-column prop="email" label="邮箱" min-width="185" show-overflow-tooltip />
-    <el-table-column prop="purpose" label="捐赠目标" min-width="150" show-overflow-tooltip />
-    <el-table-column label="捐赠类型" min-width="135">
-      <template #default="{ row }">
-        {{ donateTypeText[row.type] || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column label="捐赠物品" min-width="140" show-overflow-tooltip>
-      <template #default="{ row }">
-        {{ row.goods || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column label="金额" min-width="90">
-      <template #default="{ row }">
-        {{ formatAmount(row.amount) }}
-      </template>
-    </el-table-column>
-    <el-table-column label="支付渠道" min-width="95">
-      <template #default="{ row }">
-        {{ row.channel || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column label="祈福留言" min-width="185" show-overflow-tooltip>
-      <template #default="{ row }">
-        {{ row.message || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="donatedAt" label="捐赠时间" min-width="165" />
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="donation-table" border :data="records" row-key="id" @selection-change="emit('selection-change', $event)">
+      <el-table-column type="selection" width="42" />
+      <el-table-column prop="orderNo" label="捐赠单号" min-width="130" />
+      <el-table-column label="用户" min-width="140">
+        <template #default="{ row }">
+          <div class="user-cell">
+            <strong>{{ row.nickname }}</strong>
+            <span>{{ row.userPhone }}</span>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="name" label="善信姓名" min-width="95" />
+      <el-table-column prop="phone" label="联络手机" min-width="125" />
+      <el-table-column prop="email" label="邮箱" min-width="185" show-overflow-tooltip />
+      <el-table-column prop="purpose" label="捐赠目标" min-width="150" show-overflow-tooltip />
+      <el-table-column label="捐赠类型" min-width="135">
+        <template #default="{ row }">
+          {{ donateTypeText[row.type] || '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="捐赠物品" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.goods || '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="金额" min-width="90">
+        <template #default="{ row }">
+          {{ formatAmount(row.amount) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="支付渠道" min-width="95">
+        <template #default="{ row }">
+          {{ row.channel || '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="祈福留言" min-width="185" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.message || '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="donatedAt" label="捐赠时间" min-width="165" />
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

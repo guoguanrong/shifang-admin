@@ -32,6 +32,15 @@ function joinByComma(list) {
   return (list ?? []).map((item) => String(item).trim()).filter(Boolean).join(',')
 }
 
+// 功德利益的 desc 会在官网展示，页面模型保留 {name, desc}，避免编辑保存时被清空。
+function normalizeBenefit(item) {
+  if (typeof item === 'string' || typeof item === 'number') return { name: String(item).trim(), desc: '' }
+  return {
+    name: String(item?.name ?? item?.title ?? '').trim(),
+    desc: String(item?.desc ?? item?.text ?? '').trim(),
+  }
+}
+
 // yigui / benefit 在接口里是 JSON 数组（元素形如 {name, desc}），可能返回字符串或已解析的数组。
 function parseJsonArray(value) {
   if (Array.isArray(value)) return value
@@ -50,7 +59,8 @@ function stringifyJsonArray(list) {
 }
 
 // 列表展示的「道会时间」文本：接口没有该字段，按时间类型/固定方式组装。
-function buildTimeText(activity) {
+// 报名记录里的嵌套 activity 也复用此函数。
+export function buildTimeText(activity) {
   const startHour = activity.startHour || ''
   const endHour = activity.endHour || ''
   const range = startHour && endHour ? `${startHour} - ${endHour}` : ''
@@ -62,6 +72,8 @@ function buildTimeText(activity) {
   if (Number(activity.timeType) === activityTimeTypeValue.specific) {
     return activity.startTime && activity.endTime ? `${activity.startTime} - ${activity.endTime}` : '时间另行通知'
   }
+  // 历史数据的时间字段可能全为 null，此时不要输出「每月 — 日 」。
+  if (!activity.day && !range) return '时间另行通知'
   if (Number(activity.fixType) === activityFixTypeValue.daily) return `每日 ${range}`
   return `每月 ${activity.day ?? '—'} 日 ${range}`
 }
@@ -103,10 +115,11 @@ export function mapActivity(activity) {
       subtitle: item?.desc ?? item?.subtitle ?? '',
     })),
     benefits: parseJsonArray(activity.benefit)
-      .map((item) => (typeof item === 'string' ? item : (item?.name ?? item?.desc ?? '')))
-      .filter(Boolean),
+      .map(normalizeBenefit)
+      .filter((item) => item.name || item.desc),
     audiences: splitByComma(activity.matchCrowd),
-    status: activityStatusKey[Number(activity.status)] || 'pending',
+    // 接口未下发状态时保留 null（列表显示「未设置」），避免被默认值「待报名」误导。
+    status: activityStatusKey[Number(activity.status)] ?? null,
     listed: Number(activity.type) === activityListedValue.on,
     createTime: activity.createTime || '',
   }
@@ -144,10 +157,11 @@ export function buildActivityPayload(row) {
     registerEndTime: row.deadline || null,
     intro: row.intro || '',
     yigui: stringifyJsonArray((row.rituals ?? []).map((item) => ({ name: item.title, desc: item.subtitle }))),
-    // 功德利益在弹窗里是单行文本，接口的 benefit 为 {name, desc} 结构，故文本写入 name。
-    benefit: stringifyJsonArray((row.benefits ?? []).filter(Boolean).map((text) => ({ name: text, desc: '' }))),
+    // 功德利益保留 {name, desc}，官网会把 desc 作为说明文字渲染。
+    benefit: stringifyJsonArray((row.benefits ?? []).map(normalizeBenefit).filter((item) => item.name || item.desc)),
     matchCrowd: joinByComma(row.audiences),
     type: row.listed ? activityListedValue.on : activityListedValue.off,
-    status: activityStatusValue[row.status] ?? activityStatusValue.pending,
+    // status 为 null 表示接口未下发状态，保持 null 以便编辑时不提交、不改写原值。
+    status: row.status == null ? null : (activityStatusValue[row.status] ?? activityStatusValue.pending),
   }
 }

@@ -19,38 +19,42 @@ const onlineText = {
 </script>
 
 <template>
-  <el-table class="camera-table" border :data="cameras" row-key="id">
-    <el-table-column prop="code" label="摄像头编号" min-width="130" />
-    <el-table-column prop="location" label="摄像头位置" min-width="200" />
-    <el-table-column label="在线状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.online ? 'on' : 'off']">{{ onlineText[row.online ? 'on' : 'off'] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="物联配置" min-width="100">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.configStatus]">{{ row.configStatus === 'configured' ? '已配置' : '待配置' }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="90" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="camera-table" border :data="cameras" row-key="id">
+      <el-table-column prop="code" label="摄像头编号" min-width="130" />
+      <el-table-column prop="location" label="摄像头位置" min-width="200" />
+      <el-table-column label="在线状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.online ? 'on' : 'off']">{{ onlineText[row.online ? 'on' : 'off'] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="物联配置" min-width="100">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.configStatus]">{{ row.configStatus === 'configured' ? '已配置' : '待配置' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="90" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

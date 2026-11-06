@@ -259,8 +259,8 @@ onMounted(loadPage)
 <template>
   <main class="goal-list-page">
     <header class="page-heading">
-      <h1>捐赠目标</h1>
-      <p>配置官网展示的捐赠目标、捐赠类型及关联物品</p>
+      <h1>捐赠内容</h1>
+      <p>配置官网展示的捐赠内容、捐赠类型及关联物品</p>
     </header>
 
     <section class="table-card">

@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { createRegistrationFilters } from '../../constants/listFilters'
 
-// 报名记录筛选条：收集条件后向上抛出 search / reset。
+// 报名记录筛选条：字段与 ActivityRegisterDTO 对齐，收集条件后抛出 search / reset。
 const emit = defineEmits(['search', 'reset'])
 
 const form = reactive(createRegistrationFilters())
@@ -17,16 +17,12 @@ function resetForm() {
 <template>
   <div class="filter-card">
     <div class="filter-field title-field">
-      <span>活动标题</span>
-      <el-input v-model="form.activityTitle" placeholder="请输入活动标题" clearable @keyup.enter="emit('search', { ...form })" />
+      <span>关键词</span>
+      <el-input v-model="form.searchKey" placeholder="活动标题 / 姓名 / 凭证号" clearable @keyup.enter="emit('search', { ...form })" />
     </div>
     <div class="filter-field user-phone-field">
-      <span>绑定手机号</span>
-      <el-input v-model="form.userPhone" placeholder="请输入绑定手机号" clearable @keyup.enter="emit('search', { ...form })" />
-    </div>
-    <div class="filter-field phone-field">
-      <span>联络手机</span>
-      <el-input v-model="form.phone" placeholder="请输入联络手机号" clearable @keyup.enter="emit('search', { ...form })" />
+      <span>善信手机号</span>
+      <el-input v-model="form.mobile" placeholder="请输入善信手机号" clearable @keyup.enter="emit('search', { ...form })" />
     </div>
     <div class="filter-field date-field">
       <span>报名时间</span>

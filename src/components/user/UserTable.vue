@@ -13,68 +13,72 @@ const emit = defineEmits(['selection-change', 'toggle-status', 'detail', 'page-c
 </script>
 
 <template>
-  <el-table class="user-table" border :data="users" row-key="id" @selection-change="emit('selection-change', $event)">
-    <el-table-column type="selection" width="42" fixed="left" />
-    <el-table-column prop="email" label="邮箱" min-width="210" fixed="left" show-overflow-tooltip />
-    <el-table-column prop="nickname" label="善信名称" min-width="120" fixed="left" show-overflow-tooltip />
-    <el-table-column prop="id" label="用户ID" min-width="80" />
-    <el-table-column prop="registeredAt" label="注册时间" min-width="165" />
-    <el-table-column prop="donateAmount" label="捐款金额" min-width="100" />
-    <el-table-column label="捐款次数" min-width="90">
-      <template #default="{ row }">{{ row.donateCount ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column label="捐物次数" min-width="90">
-      <template #default="{ row }">{{ row.donateItemCount ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column label="共建十方次数" min-width="110">
-      <template #default="{ row }">{{ row.coBuildCount ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column label="点灯次数" min-width="90">
-      <template #default="{ row }">{{ row.lightCount ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column label="神像供奉次数" min-width="110">
-      <template #default="{ row }">{{ row.worshipCount ?? '—' }}</template>
-    </el-table-column>
-    <el-table-column prop="lightAmount" label="点灯金额" min-width="100" />
-    <el-table-column prop="worshipAmount" label="供奉金额" min-width="100" />
-    <el-table-column prop="source" label="来源渠道" min-width="110" show-overflow-tooltip />
-    <el-table-column label="状态" min-width="90" fixed="right">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ row.status === 'normal' ? '正常' : '冻结中' }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="130" fixed="right">
-      <template #default="{ row }">
-        <ActionLink
-          v-if="row.status === 'normal'"
-          :icon="Lock"
-          text="冻结"
-          danger
-          @click="emit('toggle-status', row)"
-        />
-        <ActionLink
-          v-else
-          :icon="Unlock"
-          text="解冻"
-          @click="emit('toggle-status', row)"
-        />
-        <ActionLink :icon="View" text="详情" @click="emit('detail', row)" />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="user-table" border :data="users" row-key="id" @selection-change="emit('selection-change', $event)">
+      <el-table-column type="selection" width="42" fixed="left" />
+      <el-table-column prop="email" label="邮箱" min-width="210" fixed="left" show-overflow-tooltip />
+      <el-table-column prop="nickname" label="善信名称" min-width="120" fixed="left" show-overflow-tooltip />
+      <el-table-column prop="id" label="用户ID" min-width="80" />
+      <el-table-column prop="registeredAt" label="注册时间" min-width="165" />
+      <el-table-column prop="donateAmount" label="捐款金额" min-width="100" />
+      <el-table-column label="捐款次数" min-width="90">
+        <template #default="{ row }">{{ row.donateCount ?? '—' }}</template>
+      </el-table-column>
+      <el-table-column label="捐物次数" min-width="90">
+        <template #default="{ row }">{{ row.donateItemCount ?? '—' }}</template>
+      </el-table-column>
+      <el-table-column label="共建十方次数" min-width="110">
+        <template #default="{ row }">{{ row.coBuildCount ?? '—' }}</template>
+      </el-table-column>
+      <el-table-column label="点灯次数" min-width="90">
+        <template #default="{ row }">{{ row.lightCount ?? '—' }}</template>
+      </el-table-column>
+      <el-table-column label="神像供奉次数" min-width="110">
+        <template #default="{ row }">{{ row.worshipCount ?? '—' }}</template>
+      </el-table-column>
+      <el-table-column prop="lightAmount" label="点灯金额" min-width="100" />
+      <el-table-column prop="worshipAmount" label="供奉金额" min-width="100" />
+      <el-table-column prop="source" label="来源渠道" min-width="110" show-overflow-tooltip />
+      <el-table-column label="状态" min-width="90" fixed="right">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status]">{{ row.status === 'normal' ? '正常' : '冻结中' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="130" fixed="right">
+        <template #default="{ row }">
+          <ActionLink
+            v-if="row.status === 'normal'"
+            :icon="Lock"
+            text="冻结"
+            danger
+            @click="emit('toggle-status', row)"
+          />
+          <ActionLink
+            v-else
+            :icon="Unlock"
+            text="解冻"
+            @click="emit('toggle-status', row)"
+          />
+          <ActionLink :icon="View" text="详情" @click="emit('detail', row)" />
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

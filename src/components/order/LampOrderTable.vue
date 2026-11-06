@@ -14,58 +14,62 @@ const emit = defineEmits(['selection-change', 'preview', 'page-change'])
 </script>
 
 <template>
-  <el-table class="order-table" border :data="orders" row-key="id" @selection-change="emit('selection-change', $event)">
-    <el-table-column type="selection" width="42" />
-    <el-table-column prop="orderNo" label="订单号" min-width="135" />
-    <el-table-column label="用户" min-width="140">
-      <template #default="{ row }">
-        <div class="user-cell">
-          <strong>{{ row.nickname }}</strong>
-          <span>{{ row.userPhone }}</span>
-        </div>
-      </template>
-    </el-table-column>
-    <el-table-column prop="lamp" label="灯型" min-width="90" />
-    <el-table-column prop="name" label="善信姓名" min-width="95" />
-    <el-table-column prop="birth" label="生辰" min-width="105" />
-    <el-table-column prop="wish" label="祈福心愿" min-width="190" show-overflow-tooltip />
-    <el-table-column label="数量" min-width="65">
-      <template #default="{ row }">
-        {{ row.quantity }} 盏
-      </template>
-    </el-table-column>
-    <el-table-column prop="period" label="供奉周期" min-width="80" />
-    <el-table-column label="金额" min-width="70">
-      <template #default="{ row }">
-        ${{ row.amount }}
-      </template>
-    </el-table-column>
-    <el-table-column label="状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ orderStatusText[row.status] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="orderedAt" label="下单时间" min-width="165" />
-    <el-table-column prop="expireAt" label="供奉到期时间" min-width="165" />
-    <el-table-column label="操作" width="135" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="View" text="查看点灯预览" @click="emit('preview', row)" />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="order-table" border :data="orders" row-key="id" @selection-change="emit('selection-change', $event)">
+      <el-table-column type="selection" width="42" />
+      <el-table-column prop="orderNo" label="订单号" min-width="135" />
+      <el-table-column label="用户" min-width="140">
+        <template #default="{ row }">
+          <div class="user-cell">
+            <strong>{{ row.nickname }}</strong>
+            <span>{{ row.userPhone }}</span>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="lamp" label="灯型" min-width="90" />
+      <el-table-column prop="name" label="善信姓名" min-width="95" />
+      <el-table-column prop="birth" label="生辰" min-width="105" />
+      <el-table-column prop="wish" label="祈福心愿" min-width="190" show-overflow-tooltip />
+      <el-table-column label="数量" min-width="65">
+        <template #default="{ row }">
+          {{ row.quantity }} 盏
+        </template>
+      </el-table-column>
+      <el-table-column prop="period" label="供奉周期" min-width="80" />
+      <el-table-column label="金额" min-width="70">
+        <template #default="{ row }">
+          ${{ row.amount }}
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status]">{{ orderStatusText[row.status] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="orderedAt" label="下单时间" min-width="165" />
+      <el-table-column prop="expireAt" label="供奉到期时间" min-width="165" />
+      <el-table-column label="操作" width="135" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="View" text="查看点灯预览" @click="emit('preview', row)" />
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

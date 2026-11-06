@@ -210,6 +210,7 @@ function exportApplications() {
       </div>
 
       <ApplyTable
+        v-loading="loading"
         :applications="applications"
         :total="total"
         :current-page="currentPage"

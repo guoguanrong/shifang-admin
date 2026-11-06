@@ -10,27 +10,31 @@ const emit = defineEmits(['page-change'])
 </script>
 
 <template>
-  <el-table class="log-table" border :data="logs" row-key="id">
-    <el-table-column prop="operator" label="账号姓名" min-width="140" />
-    <el-table-column prop="module" label="模块" min-width="100" />
-    <el-table-column prop="action" label="操作" min-width="100" />
-    <el-table-column prop="detail" label="详情" min-width="280" show-overflow-tooltip />
-    <el-table-column prop="ip" label="IP" min-width="115" />
-    <el-table-column prop="time" label="操作时间" min-width="165" />
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="log-table" border :data="logs" row-key="id">
+      <el-table-column prop="operator" label="账号姓名" min-width="140" />
+      <el-table-column prop="module" label="模块" min-width="100" />
+      <el-table-column prop="action" label="操作" min-width="100" />
+      <el-table-column prop="detail" label="详情" min-width="280" show-overflow-tooltip />
+      <el-table-column prop="ip" label="IP" min-width="115" />
+      <el-table-column prop="time" label="操作时间" min-width="165" />
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

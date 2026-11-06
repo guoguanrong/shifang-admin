@@ -8,19 +8,26 @@ const emit = defineEmits(['view', 'edit', 'remove'])
 
 <template>
   <el-table class="role-table" :data="roles" row-key="id" empty-text="暂无符合条件的角色">
-    <el-table-column prop="number" label="ID" width="90" />
-    <el-table-column prop="name" label="角色名称" min-width="170">
+    <el-table-column prop="id" label="ID" width="90" />
+    <el-table-column prop="name" label="角色名称" min-width="150">
       <template #default="{ row }"><strong>{{ row.name }}</strong></template>
     </el-table-column>
-    <el-table-column prop="parentName" label="上级角色" min-width="150" />
-    <el-table-column prop="childCount" label="下级角色数" min-width="125" />
-    <el-table-column prop="accountCount" label="绑定账号数量" min-width="135" />
+    <el-table-column prop="key" label="权限字符" min-width="130" show-overflow-tooltip />
+    <el-table-column label="状态" min-width="90">
+      <template #default="{ row }">
+        <span :class="['status-tag', row.status]">{{ row.status === 'enabled' ? '正常' : '停用' }}</span>
+      </template>
+    </el-table-column>
+    <el-table-column prop="accountCount" label="绑定账号数量" min-width="120" />
+    <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip>
+      <template #default="{ row }">{{ row.remark || '—' }}</template>
+    </el-table-column>
     <el-table-column label="操作" min-width="200" fixed="right">
       <template #default="{ row }">
         <ActionLink :icon="View" text="查看权限" @click="emit('view', row)" />
         <ActionLink :icon="EditPen" text="编辑" @click="emit('edit', row)" />
-        <span :title="row.childCount ? '请先处理下级角色' : row.accountCount ? '请先解除账号绑定' : ''">
-          <ActionLink :icon="Delete" text="删除" danger :disabled="Boolean(row.childCount || row.accountCount)" @click="emit('remove', row)" />
+        <span :title="row.accountCount ? '请先解除账号绑定' : ''">
+          <ActionLink :icon="Delete" text="删除" danger :disabled="Boolean(row.accountCount)" @click="emit('remove', row)" />
         </span>
       </template>
     </el-table-column>
@@ -46,4 +53,18 @@ const emit = defineEmits(['view', 'edit', 'remove'])
   :deep(.action-link.danger:not(:disabled):hover) { background: var(--admin-danger-light); }
   strong { color: var(--admin-text-primary); font-weight: 600; }
 }
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 3px 11px;
+  border-radius: var(--admin-radius-pill);
+  font-size: 12px;
+  gap: 6px;
+  font-weight: 500;
+}
+.status-tag::before { width: 6px; height: 6px; content: ''; border-radius: 50%; background: currentColor; }
+.status-tag.enabled { color: var(--admin-success); background: var(--admin-success-light); }
+.status-tag.disabled { color: var(--admin-danger); background: var(--admin-danger-light); }
 </style>

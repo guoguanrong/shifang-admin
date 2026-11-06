@@ -1,78 +1,126 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import RegistrationFilterBar from '../components/activity/RegistrationFilterBar.vue'
 import RegistrationTable from '../components/activity/RegistrationTable.vue'
-import { getInitialData } from '../services/dataSource'
 import { createRegistrationFilters } from '../constants/listFilters'
+import { getActivityRegisterList } from '../services/businessApi'
+import { getRegisterList, mapRegistration } from '../utils/registrationDisplay'
 import { downloadCsv } from '../utils/csv'
 
 const PAGE_SIZE = 10
+const EXPORT_PAGE_SIZE = 200
+const MAX_EXPORT_PAGES = 50
+
 // 报名类型字典：与 RegistrationTable 保持一致。
 const typeText = {
   group: '集体活动',
   appointment: '专场预约',
 }
 
-// 复制一份 mock 数据，页面内的查询/导出只作用于内存副本。
-const registrations = ref(getInitialData('activityRegistrations'))
+const registrations = ref([])
 const filters = ref(createRegistrationFilters())
 const selection = ref([])
 const currentPage = ref(1)
+const total = ref(0)
+const loading = ref(false)
 
-// 前端筛选：活动标题/绑定手机号/联系手机号模糊匹配，报名时间按日期闭区间比较（可留空）。
-const filteredRegistrations = computed(() => {
-  const { activityTitle, userPhone, phone, startDate, endDate } = filters.value
-  return registrations.value.filter((item) => {
-    const registeredDate = item.registeredAt.slice(0, 10)
-    return (!activityTitle || item.activityTitle.includes(activityTitle))
-      && (!userPhone || item.userPhone.includes(userPhone))
-      && (!phone || item.phone.includes(phone))
-      && (!startDate || registeredDate >= startDate)
-      && (!endDate || registeredDate <= endDate)
-  })
-})
+// 与 ActivityRegisterDTO 对齐：searchKey 关键词、mobile 善信手机号、报名时间区间。
+function buildParams(page = currentPage.value, pageSize = PAGE_SIZE) {
+  const { searchKey, mobile, startDate, endDate } = filters.value
+  return {
+    page,
+    pageSize,
+    searchKey: searchKey.trim() || undefined,
+    mobile: mobile.trim() || undefined,
+    startTime: startDate ? `${startDate} 00:00:00` : undefined,
+    endTime: endDate ? `${endDate} 23:59:59` : undefined,
+  }
+}
 
-// 客户端分页：每页固定 10 条，切换筛选条件时由 search/reset 重置回第 1 页。
-const pagedRegistrations = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return filteredRegistrations.value.slice(start, start + PAGE_SIZE)
-})
+async function loadRegistrations() {
+  loading.value = true
+  try {
+    const result = getRegisterList(await getActivityRegisterList(buildParams()))
+    registrations.value = result.list.map(mapRegistration)
+    total.value = Number.isFinite(result.totalRow) && result.totalRow > 0
+      ? result.totalRow
+      : registrations.value.length
+    // 仅在请求页超出总页数时回退，避免后端不认 page 时把翻页拉回第一页。
+    if (Number.isFinite(result.totalPage) && result.totalPage > 0 && currentPage.value > result.totalPage) {
+      currentPage.value = Number.isFinite(result.currentPage) && result.currentPage > 0
+        ? result.currentPage
+        : result.totalPage
+    }
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '获取报名记录失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadRegistrations)
 
 function search(form) {
-  filters.value = form
+  filters.value = { ...form }
   currentPage.value = 1
-  ElMessage.success(`查询完成，共找到 ${filteredRegistrations.value.length} 条报名记录`)
+  loadRegistrations()
 }
 
 function reset(form) {
-  filters.value = form
+  filters.value = { ...form }
   currentPage.value = 1
+  loadRegistrations()
 }
 
 function changePage(page) {
   currentPage.value = page
+  loadRegistrations()
 }
 
-// 导出名单：有勾选导勾选，否则导出全部筛选结果。
-function exportRegistrations() {
-  const exportRows = selection.value.length ? selection.value : filteredRegistrations.value
-  const headers = ['活动标题', '道会时间', '道会类型', '用户', '绑定手机号', '善信姓名', '联络手机', '随行人数', '预约日期', '祈福心愿', '报名时间']
-  const rows = exportRows.map((item) => [
-    item.activityTitle,
-    item.activityTime,
-    typeText[item.type],
-    `${item.nickname}（${item.userPhone}）`,
-    item.userPhone,
-    item.name,
-    item.phone,
-    `${item.companions} 人`,
-    item.blessingDate || '—',
-    item.wish,
-    item.registeredAt,
-  ])
-  downloadCsv('报名名单.csv', headers, rows)
-  ElMessage.success('报名名单已导出')
+// 服务端分页后，导出全量需要按当前筛选条件逐页拉取。
+async function fetchAllRegistrations() {
+  const rows = []
+  let page = 1
+  while (page <= MAX_EXPORT_PAGES) {
+    const result = getRegisterList(await getActivityRegisterList(buildParams(page, EXPORT_PAGE_SIZE)))
+    rows.push(...result.list)
+    if (!result.list.length) break
+    const hasTotal = Number.isFinite(result.totalRow) && result.totalRow > 0
+    const hasPages = Number.isFinite(result.totalPage) && result.totalPage > 0
+    if (hasTotal && rows.length >= result.totalRow) break
+    if (hasPages && page >= result.totalPage) break
+    // 后端可能限制 pageSize，只有总数与页数都缺失时才按「不满一页」收尾。
+    if (!hasTotal && !hasPages && result.list.length < EXPORT_PAGE_SIZE) break
+    page += 1
+  }
+  return rows.map(mapRegistration)
+}
+
+// 导出名单：有勾选导勾选，否则导出当前筛选条件下的全部记录。
+async function exportRegistrations() {
+  loading.value = true
+  try {
+    const exportRows = selection.value.length ? selection.value : await fetchAllRegistrations()
+    const headers = ['活动标题', '道会时间', '道会类型', '善信姓名', '善信手机', '随行人数', '凭证号', '祈福心愿', '报名时间']
+    const rows = exportRows.map((item) => [
+      item.activityTitle,
+      item.activityTime,
+      typeText[item.type],
+      item.name,
+      item.phone,
+      `${item.companions} 人`,
+      item.cert || '—',
+      item.wish,
+      item.registeredAt,
+    ])
+    downloadCsv('报名名单.csv', headers, rows)
+    ElMessage.success(`报名名单已导出（${exportRows.length} 条）`)
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出报名名单失败')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -80,7 +128,7 @@ function exportRegistrations() {
   <main class="registration-list-page">
     <header class="page-heading">
       <h1>报名记录</h1>
-      <p>所有活动的报名名单 · 按活动/状态筛选与导出</p>
+      <p>所有活动的报名名单 · 按关键词/手机号/报名时间筛选与导出</p>
     </header>
 
     <RegistrationFilterBar @search="search" @reset="reset" />
@@ -88,12 +136,13 @@ function exportRegistrations() {
     <section class="table-card">
       <div class="table-toolbar">
         <span><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button class="export-button" @click="exportRegistrations">导出名单</el-button>
+        <el-button class="export-button" :disabled="loading" @click="exportRegistrations">导出名单</el-button>
       </div>
 
       <RegistrationTable
-        :registrations="pagedRegistrations"
-        :total="filteredRegistrations.length"
+        v-loading="loading"
+        :registrations="registrations"
+        :total="total"
         :current-page="currentPage"
         @selection-change="selection = $event"
         @page-change="changePage"

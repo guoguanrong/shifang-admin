@@ -9,6 +9,7 @@ import { uploadBusinessFile } from '../../services/businessApi'
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   activity: { type: Object, default: null },
+  saving: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue', 'save'])
@@ -88,9 +89,11 @@ watch(visible, (open) => {
     deadline: source && /^\d{4}-\d{2}-\d{2}/.test(source.deadline ?? '') ? source.deadline : '',
     intro: source?.intro ?? '',
     rituals: (source?.rituals ?? []).map((item) => ({ ...item })),
-    benefits: [...(source?.benefits ?? [])],
+    benefits: (source?.benefits ?? []).map((item) => (typeof item === 'string' ? { name: item, desc: '' } : { ...item })),
     audiences: [...(source?.audiences ?? [])],
-    status: registerStatusOptions.some((item) => item.value === source?.status) ? source.status : 'pending',
+    status: source
+      ? (registerStatusOptions.some((item) => item.value === source.status) ? source.status : null)
+      : 'pending',
     listed: source?.listed === false ? 'off' : 'on',
   })
 })
@@ -148,9 +151,9 @@ function removeRitual(index) {
   form.rituals.splice(index, 1)
 }
 
-// 功德利益：单行输入列表，可增删。
+// 功德利益：标题 + 说明，说明会展示在官网详情页，可增删。
 function addBenefit() {
-  form.benefits.push('')
+  form.benefits.push({ name: '', desc: '' })
 }
 
 function removeBenefit(index) {
@@ -191,6 +194,7 @@ function buildTimeText() {
 
 // 提交：标题必填，图片先上传，再组装 payload 交由父级写入接口。
 async function submitActivity() {
+  if (props.saving) return
   if (!form.title.trim()) {
     ElMessage.warning('请输入活动标题')
     return
@@ -241,12 +245,14 @@ async function submitActivity() {
     deadline: form.deadline || originalDeadline.value,
     intro: form.intro.trim(),
     rituals: form.rituals.map((item) => ({ ...item })),
-    benefits: form.benefits.map((item) => item.trim()),
+    benefits: form.benefits
+      .map((item) => ({ name: item.name.trim(), desc: item.desc.trim() }))
+      .filter((item) => item.name || item.desc),
     audiences: [...form.audiences],
     status: form.status,
     listed: form.listed === 'on',
   })
-  visible.value = false
+  // 弹窗由父级在保存成功后关闭，失败时保留已填内容。
 }
 </script>
 
@@ -267,9 +273,11 @@ async function submitActivity() {
           </div>
           <label v-if="form.images.length < MAX_IMAGES" class="image-add">
             <input type="file" accept="image/*" multiple @change="onImagesChange" />
-            <span class="add-icon">＋</span>
-            <span>上传图片</span>
-            <em>{{ form.images.length }}/{{ MAX_IMAGES }}</em>
+            <span class="add-body">
+              <span class="add-icon">＋</span>
+              <span class="add-text">上传图片</span>
+              <em>{{ form.images.length }}/{{ MAX_IMAGES }}</em>
+            </span>
           </label>
         </div>
         <p class="field-tip">上传后展示于用户端活动详情轮播图，最多 6 张</p>
@@ -349,8 +357,8 @@ async function submitActivity() {
         <el-date-picker
           v-model="specificRange"
           type="datetimerange"
-          value-format="YYYY-MM-DD HH:mm"
-          format="YYYY/MM/DD HH:mm"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          format="YYYY/MM/DD HH:mm:ss"
           start-placeholder="开始时间"
           end-placeholder="结束时间"
         />
@@ -382,8 +390,8 @@ async function submitActivity() {
           <el-date-picker
             v-model="form.deadline"
             type="datetime"
-            value-format="YYYY-MM-DD HH:mm"
-            format="YYYY/MM/DD HH:mm"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            format="YYYY/MM/DD HH:mm:ss"
             placeholder="请选择时间"
           />
           <p class="field-tip">截止后停止登记,用户端展示</p>
@@ -415,8 +423,9 @@ async function submitActivity() {
 
       <el-form-item label="参加法会的功德利益">
         <div class="benefit-list">
-          <div v-for="(_, index) in form.benefits" :key="index" class="benefit-line">
-            <el-input v-model="form.benefits[index]" placeholder="请输入功德利益" maxlength="50" />
+          <div v-for="(benefit, index) in form.benefits" :key="index" class="benefit-line">
+            <el-input v-model="benefit.name" class="benefit-name" placeholder="请输入功德利益" maxlength="50" />
+            <el-input v-model="benefit.desc" placeholder="请输入说明" maxlength="120" />
             <el-button class="mini-remove" @click="removeBenefit(index)">删除</el-button>
           </div>
           <el-button class="chip-add" @click="addBenefit">+ 新增功德利益</el-button>
@@ -450,7 +459,7 @@ async function submitActivity() {
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button class="save-button" @click="submitActivity">提交</el-button>
+      <el-button class="save-button" :loading="saving" @click="submitActivity">提交</el-button>
     </template>
   </el-dialog>
 </template>
@@ -480,16 +489,7 @@ async function submitActivity() {
   border-bottom: 1px dashed var(--admin-border);
 }
 
-.image-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .image-tile {
-  position: relative;
-  width: 96px;
-  height: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -498,14 +498,6 @@ async function submitActivity() {
   padding: 6px;
   text-align: center;
   background: linear-gradient(145deg, #2c3a33, #4a4438);
-  border-radius: var(--admin-radius-sm);
-  overflow: hidden;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
 
   strong {
     color: #e8d9ae;
@@ -517,60 +509,6 @@ async function submitActivity() {
     color: rgba(255, 255, 255, 0.65);
     font-size: 10px;
     transform: scale(0.9);
-  }
-
-  .tile-remove {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    display: grid;
-    place-items: center;
-    color: var(--admin-text-secondary);
-    font-size: 12px;
-    font-style: normal;
-    background: var(--admin-surface);
-    border-radius: 50%;
-    cursor: pointer;
-
-    &:hover {
-      color: var(--admin-danger);
-    }
-  }
-}
-
-.image-add {
-  width: 96px;
-  height: 72px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--admin-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  border: 1px dashed var(--admin-border-strong);
-  border-radius: var(--admin-radius-sm);
-
-  &:hover {
-    color: var(--admin-primary);
-    border-color: var(--admin-primary);
-  }
-
-  input[type='file'] {
-    display: none;
-  }
-
-  .add-icon {
-    font-size: 16px;
-  }
-
-  em {
-    color: var(--admin-text-muted);
-    font-size: 11px;
-    font-style: normal;
   }
 }
 
@@ -664,31 +602,36 @@ async function submitActivity() {
 .ritual-list,
 .benefit-list {
   width: 100%;
+  min-width: 0;
 }
 
 .ritual-item {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
   gap: 10px;
+  align-items: start;
   margin-bottom: 10px;
 }
 
 .ritual-index {
   width: 22px;
   height: 22px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  margin-top: 4px;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 5px;
   color: var(--admin-text-secondary);
   font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   background: var(--admin-surface-muted);
   border: 1px solid var(--admin-border);
   border-radius: 50%;
 }
 
 .ritual-fields {
-  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -699,9 +642,19 @@ async function submitActivity() {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 
   .el-input {
     flex: 1;
+    min-width: 0;
+  }
+
+  .mini-remove {
+    flex: 0 0 auto;
+  }
+
+  .benefit-name {
+    flex: 0 0 160px;
   }
 }
 

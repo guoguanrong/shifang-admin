@@ -19,7 +19,7 @@ const statusText = {
   <el-table class="item-table" border :data="items" row-key="id">
     <el-table-column label="物品图片" min-width="100">
       <template #default="{ row }">
-        <img v-if="row.image" :src="row.image" class="item-thumb-img" alt="物品图片" />
+        <img v-if="row.image" v-media-preview="row.image" :src="row.image" class="item-thumb-img" alt="物品图片" />
         <span v-else class="item-thumb">{{ row.name.slice(0, 1) }}</span>
       </template>
     </el-table-column>

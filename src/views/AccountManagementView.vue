@@ -1,46 +1,102 @@
 <script setup>
-import { computed, h, ref } from 'vue'
-import { storeToRefs } from 'pinia'
+import { computed, h, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AccountFilterBar from '../components/account/AccountFilterBar.vue'
 import AccountFormDialog from '../components/account/AccountFormDialog.vue'
 import AccountTable from '../components/account/AccountTable.vue'
 import { createAccountFilters } from '../constants/listFilters'
-import { usePermissionsStore } from '../stores/permissions'
+import {
+  adminUpdateUserPwd,
+  deleteSysUsers,
+  getSysRoleList,
+  getSysUserList,
+  saveSysUser,
+  updateSysUser,
+  updateSysUserStatus,
+} from '../services/systemApi'
 
 const PAGE_SIZE = 10
-const permissionsStore = usePermissionsStore()
-const { accounts, roles: roleRecords } = storeToRefs(permissionsStore)
-const roles = computed(() => {
-  const byId = Object.fromEntries(roleRecords.value.map((role) => [role.id, { id: role.id, label: role.name, children: [] }]))
-  const roots = []
-  roleRecords.value.forEach((role) => {
-    if (role.parentId && byId[role.parentId]) byId[role.parentId].children.push(byId[role.id])
-    else roots.push(byId[role.id])
-  })
-  return roots
-})
-const roleLabels = computed(() => Object.fromEntries(roleRecords.value.map((role) => [role.id, role.name])))
+const DEFAULT_PASSWORD = '123456'
+
+// 状态字典：接口 0.禁用 / 1.正常，页面内部沿用 enabled / disabled。
+const statusValue = { enabled: 1, disabled: 0 }
+const statusKey = { 1: 'enabled', 0: 'disabled' }
+
+// SysUserVo → 表格行：角色取roleIdList/roleNameList，最后登录取lastLoginTime。
+function mapAccount(item) {
+  return {
+    id: item.id,
+    username: item.username || '—',
+    name: item.nickname || '—',
+    status: statusKey[Number(item.status)] || 'disabled',
+    lastLogin: item.lastLoginTime || '—',
+    roleId: item.roleIdList?.[0] ?? '',
+    roleNames: item.roleNameList || [],
+  }
+}
+
+const accounts = ref([])
+const roleRecords = ref([])
 const filters = ref(createAccountFilters())
 const currentPage = ref(1)
+const total = ref(0)
+const loading = ref(false)
 const dialogVisible = ref(false)
 const editingAccount = ref(null)
 
-const filteredAccounts = computed(() => {
-  const { name, roleId, status } = filters.value
-  const keyword = name.trim().toLowerCase()
-  return accounts.value.filter((account) => (
-    (!keyword || account.name.toLowerCase().includes(keyword) || account.username.toLowerCase().includes(keyword))
-    && (!roleId || account.roleId === roleId)
-    && (!status || account.status === status)
-  ))
-})
-const pagedAccounts = computed(() => filteredAccounts.value.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE))
+// 后端角色为平铺结构（无 parentId），构建成单层树供 tree-select 使用。
+const roles = computed(() => roleRecords.value.map((role) => ({ id: role.id, label: role.name, children: [] })))
 const accountNames = computed(() => accounts.value.map((account) => account.username))
 
+// 拉取账号列表：姓名关键词、状态由服务端筛选；接口不支持按角色筛选，
+// 选择角色时在当前页内过滤展示（totalRow 仍为服务端总数）。
+async function loadAccounts() {
+  loading.value = true
+  const { name, status } = filters.value
+  const params = {
+    page: currentPage.value,
+    pageSize: PAGE_SIZE,
+    searchKey: name.trim() || undefined,
+    status: status ? statusValue[status] : undefined,
+  }
+
+  try {
+    const result = await getSysUserList(params)
+    const list = Array.isArray(result) ? result : result?.list
+    const rows = Array.isArray(list) ? list.map(mapAccount) : []
+    const { roleId } = filters.value
+    accounts.value = roleId ? rows.filter((row) => row.roleId === roleId) : rows
+    const responseTotal = Number(result?.totalRow)
+    total.value = Number.isFinite(responseTotal) ? responseTotal : rows.length
+    const responsePage = Number(result?.currentPage)
+    if (Number.isFinite(responsePage) && responsePage > 0) currentPage.value = responsePage
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '获取账号列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 角色下拉数据：量级小，一次取全。
+async function loadRoles() {
+  try {
+    const result = await getSysRoleList({ page: 1, pageSize: 200 })
+    const list = Array.isArray(result) ? result : result?.list
+    roleRecords.value = Array.isArray(list) ? list : []
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '获取角色列表失败')
+  }
+}
+
 function search(form) {
-  filters.value = form
+  filters.value = { ...form }
   currentPage.value = 1
+  loadAccounts()
+}
+
+function changePage(page) {
+  currentPage.value = page
+  loadAccounts()
 }
 
 function openAdd() {
@@ -53,15 +109,26 @@ function openEdit(account) {
   dialogVisible.value = true
 }
 
-function saveAccount(payload) {
-  if (editingAccount.value) {
-    Object.assign(editingAccount.value, { name: payload.name, roleId: payload.roleId, status: payload.status })
-    ElMessage.success('账号已更新')
-  } else {
-    const nextId = Math.max(0, ...accounts.value.map((account) => account.id)) + 1
-    accounts.value.unshift({ id: nextId, ...payload, lastLogin: '—' })
-    currentPage.value = 1
-    ElMessage.success('账号已新增，默认密码为 123456')
+// 保存账号：新增带默认密码，角色走 roleIdList；编辑时提交 id。
+async function saveAccount(payload) {
+  const base = {
+    username: payload.username,
+    nickname: payload.name,
+    status: statusValue[payload.status] ?? statusValue.enabled,
+    roleIdList: payload.roleId ? [payload.roleId] : [],
+  }
+  try {
+    if (editingAccount.value) {
+      await updateSysUser({ id: editingAccount.value.id, ...base })
+      ElMessage.success('账号已更新')
+    } else {
+      await saveSysUser({ ...base, password: DEFAULT_PASSWORD, type: 'SYS_USER' })
+      ElMessage.success('账号已新增，默认密码为 123456')
+    }
+    dialogVisible.value = false
+    await loadAccounts()
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '保存账号失败')
   }
 }
 
@@ -72,6 +139,7 @@ function confirmation(message, note) {
   ])
 }
 
+// 重置密码：管理员接口，重置为默认密码。
 async function resetPassword(account) {
   try {
     await ElMessageBox.confirm(
@@ -79,9 +147,15 @@ async function resetPassword(account) {
       '操作确认',
       { confirmButtonText: '确定', cancelButtonText: '取消' },
     )
-    ElMessage.info(`演示操作已确认：账号 ${account.username} 的默认密码为 123456`)
   } catch {
-    // 取消操作。
+    // 用户取消操作时无需提示。
+    return
+  }
+  try {
+    await adminUpdateUserPwd(account.id, DEFAULT_PASSWORD)
+    ElMessage.success(`账号 ${account.username} 的密码已重置为 ${DEFAULT_PASSWORD}`)
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '重置密码失败')
   }
 }
 
@@ -96,10 +170,16 @@ async function toggleStatus(account) {
       '操作确认',
       { confirmButtonText: '确定', cancelButtonText: '取消' },
     )
-    account.status = enabling ? 'enabled' : 'disabled'
-    ElMessage.success(`账号已${enabling ? '启用' : '禁用'}`)
   } catch {
-    // 取消操作。
+    // 用户取消操作时无需提示。
+    return
+  }
+  try {
+    await updateSysUserStatus({ id: account.id, status: statusValue[enabling ? 'enabled' : 'disabled'] })
+    ElMessage.success(`账号已${enabling ? '启用' : '禁用'}`)
+    await loadAccounts()
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || `${enabling ? '启用' : '禁用'}失败`)
   }
 }
 
@@ -110,14 +190,26 @@ async function removeAccount(account) {
       '操作确认',
       { confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' },
     )
-    accounts.value = accounts.value.filter((item) => item.id !== account.id)
-    const lastPage = Math.max(1, Math.ceil(filteredAccounts.value.length / PAGE_SIZE))
-    currentPage.value = Math.min(currentPage.value, lastPage)
-    ElMessage.success('账号已删除')
   } catch {
-    // 取消操作。
+    // 用户取消操作时无需提示。
+    return
+  }
+  try {
+    await deleteSysUsers([account.id])
+    ElMessage.success('账号已删除')
+    // 删除的是当前页最后一条时回退一页。
+    const lastPage = Math.max(1, Math.ceil((total.value - 1) / PAGE_SIZE))
+    currentPage.value = Math.min(currentPage.value, lastPage)
+    await loadAccounts()
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '删除账号失败')
   }
 }
+
+onMounted(() => {
+  loadRoles()
+  loadAccounts()
+})
 </script>
 
 <template>
@@ -131,19 +223,19 @@ async function removeAccount(account) {
 
     <section class="table-card">
       <div class="table-toolbar">
-        <span>共 {{ filteredAccounts.length }} 个账号</span>
-        <el-button type="primary" @click="openAdd">+ 新增账号</el-button>
+        <span>共 {{ total }} 个账号</span>
+        <el-button type="primary" :disabled="loading" @click="openAdd">+ 新增账号</el-button>
       </div>
       <AccountTable
-        :accounts="pagedAccounts"
-        :roles="roleLabels"
-        :total="filteredAccounts.length"
+        v-loading="loading"
+        :accounts="accounts"
+        :total="total"
         :current-page="currentPage"
         @edit="openEdit"
         @reset-password="resetPassword"
         @toggle-status="toggleStatus"
         @remove="removeAccount"
-        @page-change="currentPage = $event"
+        @page-change="changePage"
       />
     </section>
 

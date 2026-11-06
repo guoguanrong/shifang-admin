@@ -16,51 +16,43 @@ const typeText = {
 </script>
 
 <template>
-  <el-table class="registration-table" border :data="registrations" row-key="id" @selection-change="emit('selection-change', $event)">
-    <el-table-column type="selection" width="42" />
-    <el-table-column prop="activityTitle" label="活动标题" min-width="190" show-overflow-tooltip />
-    <el-table-column prop="activityTime" label="道会时间" min-width="170" show-overflow-tooltip />
-    <el-table-column label="道会类型" min-width="95">
-      <template #default="{ row }">
-        <span class="soft-tag type">{{ typeText[row.type] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="用户" min-width="140">
-      <template #default="{ row }">
-        <div class="user-cell">
-          <strong>{{ row.nickname }}</strong>
-          <span>{{ row.userPhone }}</span>
-        </div>
-      </template>
-    </el-table-column>
-    <el-table-column prop="name" label="善信姓名" min-width="90" />
-    <el-table-column prop="phone" label="联络手机" min-width="120" />
-    <el-table-column label="随行人数" min-width="80">
-      <template #default="{ row }">
-        {{ row.companions }} 人
-      </template>
-    </el-table-column>
-    <el-table-column label="预约日期" min-width="110">
-      <template #default="{ row }">
-        {{ row.blessingDate || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="wish" label="祈福心愿" min-width="120" show-overflow-tooltip />
-    <el-table-column prop="registeredAt" label="报名时间" min-width="165" />
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="registration-table" border :data="registrations" row-key="id" @selection-change="emit('selection-change', $event)">
+      <el-table-column type="selection" width="42" />
+      <el-table-column prop="activityTitle" label="活动标题" min-width="190" show-overflow-tooltip />
+      <el-table-column prop="activityTime" label="道会时间" min-width="170" show-overflow-tooltip />
+      <el-table-column label="道会类型" min-width="95">
+        <template #default="{ row }">
+          <span class="soft-tag type">{{ typeText[row.type] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="name" label="善信姓名" min-width="90" />
+      <el-table-column prop="phone" label="善信手机" min-width="120" />
+      <el-table-column label="随行人数" min-width="80">
+        <template #default="{ row }">
+          {{ row.companions }} 人
+        </template>
+      </el-table-column>
+      <el-table-column prop="cert" label="凭证号" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="wish" label="祈福心愿" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="registeredAt" label="报名时间" min-width="165" />
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

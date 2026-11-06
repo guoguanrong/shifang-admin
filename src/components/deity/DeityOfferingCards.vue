@@ -22,7 +22,7 @@ function tagText(tag) {
   <div class="deity-grid">
     <article v-for="deity in deities" :key="deity.id" class="deity-card">
       <header class="deity-head">
-        <img v-if="deity.image" :src="deity.image" class="deity-thumb-img" alt="供奉样式图" />
+        <img v-if="deity.image" v-media-preview="deity.image" :src="deity.image" class="deity-thumb-img" alt="供奉样式图" />
         <span v-else class="deity-thumb">{{ deity.name.slice(0, 1) }}</span>
         <div class="deity-head-text">
           <strong>{{ deity.name }}</strong>

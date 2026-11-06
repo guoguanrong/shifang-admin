@@ -19,7 +19,7 @@ function getMaterialSummary(lamp) {
   <div class="lamp-grid">
     <article v-for="lamp in lamps" :key="lamp.id" class="lamp-card">
       <header class="lamp-head">
-        <img v-if="lamp.image || lamp.picture" :src="lamp.image || lamp.picture" class="lamp-thumb-img" alt="灯图片" />
+        <img v-if="lamp.image || lamp.picture" v-media-preview="lamp.image || lamp.picture" :src="lamp.image || lamp.picture" class="lamp-thumb-img" alt="灯图片" />
         <span v-else class="lamp-thumb">灯</span>
         <div class="lamp-head-text">
           <strong>{{ lamp.name }}</strong>

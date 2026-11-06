@@ -169,6 +169,7 @@ function exportUsers() {
       </div>
 
       <UserTable
+        v-loading="loading"
         :users="users"
         :total="total"
         :current-page="currentPage"

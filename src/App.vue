@@ -1,5 +1,6 @@
 <script setup>
 import zhCn from 'element-plus/es/locale/lang/zh-cn.mjs'
+import MediaPreviewDialog from './components/common/MediaPreviewDialog.vue'
 </script>
 
 <template>
@@ -11,5 +12,6 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn.mjs'
         <component :is="Component" :key="route.matched[0]?.name || route.path" />
       </Transition>
     </RouterView>
+    <MediaPreviewDialog />
   </el-config-provider>
 </template>

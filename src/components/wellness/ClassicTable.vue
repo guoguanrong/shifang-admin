@@ -19,55 +19,59 @@ const statusText = {
 </script>
 
 <template>
-  <el-table class="classic-table" border :data="classics" row-key="id">
-    <el-table-column label="封面" width="80">
-      <template #default="{ row }">
-        <img v-if="row.coverImage" :src="row.coverImage" class="cover-img" alt="文章封面" />
-        <span v-else class="cover-tile">{{ row.cover }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="title" label="文章标题" min-width="190" show-overflow-tooltip />
-    <el-table-column prop="intro" label="文章简介" min-width="310" show-overflow-tooltip />
-    <el-table-column label="阅读量" min-width="80">
-      <template #default="{ row }">
-        {{ row.reads.toLocaleString('en-US') }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="createdAt" label="新增时间" min-width="165" />
-    <el-table-column label="展示状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="230" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-        <ActionLink
-          v-if="row.status === 'shown'"
-          :icon="Hide"
-          text="隐藏"
-          @click="emit('toggle', row)"
-        />
-        <template v-else>
-          <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
-          <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="classic-table" border :data="classics" row-key="id">
+      <el-table-column label="封面" width="80">
+        <template #default="{ row }">
+          <img v-if="row.coverImage" v-media-preview="row.coverImage" :src="row.coverImage" class="cover-img" alt="文章封面" />
+          <span v-else class="cover-tile">{{ row.cover }}</span>
         </template>
-      </template>
-    </el-table-column>
-  </el-table>
+      </el-table-column>
+      <el-table-column prop="title" label="文章标题" min-width="190" show-overflow-tooltip />
+      <el-table-column prop="intro" label="文章简介" min-width="310" show-overflow-tooltip />
+      <el-table-column label="阅读量" min-width="80">
+        <template #default="{ row }">
+          {{ row.reads.toLocaleString('en-US') }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="createdAt" label="新增时间" min-width="165" />
+      <el-table-column label="展示状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="230" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+          <ActionLink
+            v-if="row.status === 'shown'"
+            :icon="Hide"
+            text="隐藏"
+            @click="emit('toggle', row)"
+          />
+          <template v-else>
+            <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
+            <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+          </template>
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

@@ -11,12 +11,19 @@ const emit = defineEmits(['update:modelValue', 'save'])
 const formRef = ref(null)
 const form = reactive({ username: '', name: '', roleId: '', status: 'enabled' })
 
+// 产品标注的规则只落在校验逻辑里，界面不展示：
+// ① 登录账号最多 30 个字符且仅允许字母和数字；② 账号姓名最多 30 个字符。
+const USERNAME_MAX_LENGTH = 30
+const USERNAME_PATTERN = /^[A-Za-z0-9]+$/
+
 const rules = {
   username: [
     { required: true, message: '请输入登录账号', trigger: 'blur' },
-    { pattern: /^[a-zA-Z][a-zA-Z0-9_]{3,31}$/, message: '4-32 位字母、数字或下划线，且以字母开头', trigger: 'blur' },
+    { max: USERNAME_MAX_LENGTH, message: `登录账号不能超过 ${USERNAME_MAX_LENGTH} 个字符`, trigger: 'blur' },
+    { pattern: USERNAME_PATTERN, message: '登录账号仅允许输入字母和数字', trigger: 'blur' },
     { validator: (_rule, value, callback) => {
-      if (props.accountNames.some((name) => name.toLowerCase() === value.toLowerCase() && value !== props.account?.username)) callback(new Error('登录账号已存在'))
+      const username = String(value ?? '').toLowerCase()
+      if (props.accountNames.some((name) => String(name ?? '').toLowerCase() === username && value !== props.account?.username)) callback(new Error('登录账号已存在'))
       else callback()
     }, trigger: 'blur' },
   ],
@@ -25,6 +32,26 @@ const rules = {
     { max: 30, message: '账号姓名不能超过 30 个字符', trigger: 'blur' },
   ],
   roleId: [{ required: true, message: '请选择角色', trigger: 'change' }],
+}
+
+// 输入时直接过滤非法字符；中文输入法组合期间先不处理，等组合结束再统一过滤。
+let composing = false
+
+function filterUsername(value) {
+  form.username = String(value ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, USERNAME_MAX_LENGTH)
+}
+
+function onUsernameInput(value) {
+  if (!composing) filterUsername(value)
+}
+
+function onUsernameCompositionStart() {
+  composing = true
+}
+
+function onUsernameCompositionEnd(event) {
+  composing = false
+  filterUsername(event?.target?.value ?? form.username)
 }
 
 watch(() => props.modelValue, (visible) => {
@@ -62,7 +89,14 @@ async function submit() {
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="submit">
       <div v-if="!account" class="form-grid">
         <el-form-item label="登录账号" prop="username">
-          <el-input v-model="form.username" maxlength="32" placeholder="请输入登录账号" />
+          <el-input
+            :model-value="form.username"
+            :maxlength="USERNAME_MAX_LENGTH"
+            placeholder="请输入登录账号"
+            @compositionstart="onUsernameCompositionStart"
+            @compositionend="onUsernameCompositionEnd"
+            @input="onUsernameInput"
+          />
         </el-form-item>
         <el-form-item label="登录密码">
           <el-input model-value="默认登录密码 123456" disabled />

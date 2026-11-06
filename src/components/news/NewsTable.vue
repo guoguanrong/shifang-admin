@@ -24,56 +24,66 @@ function formatReads(reads) {
 </script>
 
 <template>
-  <el-table class="news-table" border :data="newsList" row-key="id">
-    <el-table-column label="图片" width="80">
-      <template #default="{ row }">
-        <img v-if="row.images[0]?.url" :src="row.images[0].url" class="news-thumb-img" alt="动态图片" />
-        <span v-else class="news-thumb">{{ row.title.slice(0, 1) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="title" label="动态标题" min-width="180" show-overflow-tooltip />
-    <el-table-column prop="detail" label="详细内容" min-width="290" show-overflow-tooltip />
-    <el-table-column prop="blessing" label="祈福寄语" min-width="210" show-overflow-tooltip />
-    <el-table-column label="阅读量" min-width="80">
-      <template #default="{ row }">
-        {{ formatReads(row.reads) }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="createdAt" label="新增时间" min-width="165" />
-    <el-table-column label="展示状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="230" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-        <ActionLink
-          v-if="row.status === 'shown'"
-          :icon="Hide"
-          text="隐藏"
-          @click="emit('toggle', row)"
-        />
-        <template v-else>
-          <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
-          <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="news-table" border :data="newsList" row-key="id">
+      <el-table-column label="图片" width="80">
+        <template #default="{ row }">
+          <img
+            v-if="row.images[0]?.url"
+            v-media-preview="(row.images ?? []).map((item) => item.url || item.remoteUrl).filter(Boolean)"
+            :src="row.images[0].url"
+            class="news-thumb-img"
+            alt="动态图片"
+          />
+          <span v-else class="news-thumb">{{ row.title.slice(0, 1) }}</span>
         </template>
-      </template>
-    </el-table-column>
-  </el-table>
+      </el-table-column>
+      <el-table-column prop="title" label="动态标题" min-width="180" show-overflow-tooltip />
+      <el-table-column prop="detail" label="详细内容" min-width="290" show-overflow-tooltip />
+      <el-table-column prop="blessing" label="祈福寄语" min-width="210" show-overflow-tooltip />
+      <el-table-column label="阅读量" min-width="80">
+        <template #default="{ row }">
+          {{ formatReads(row.reads) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="createdAt" label="新增时间" min-width="165" />
+      <el-table-column label="展示状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="230" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+          <ActionLink
+            v-if="row.status === 'shown'"
+            :icon="Hide"
+            text="隐藏"
+            @click="emit('toggle', row)"
+          />
+          <template v-else>
+            <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
+            <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+          </template>
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

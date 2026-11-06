@@ -72,11 +72,12 @@ export function createActivityFilters() {
   }
 }
 
+// 与 ActivityRegisterDTO 对齐：searchKey 关键词、mobile 善信手机号（右模糊）、
+// startTime/endTime 报名时间区间。
 export function createRegistrationFilters() {
   return {
-    activityTitle: '',
-    userPhone: '',
-    phone: '',
+    searchKey: '',
+    mobile: '',
     startDate: '',
     endDate: '',
   }

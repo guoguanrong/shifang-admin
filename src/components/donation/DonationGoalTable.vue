@@ -31,7 +31,7 @@ function progressColor(goal) {
   <el-table class="goal-table" border :data="goals" row-key="id">
     <el-table-column label="目标效果图" width="100">
       <template #default="{ row }">
-        <img v-if="row.image" :src="row.image" class="goal-thumb-img" alt="目标效果图" />
+        <img v-if="row.image" v-media-preview="row.image" :src="row.image" class="goal-thumb-img" alt="目标效果图" />
         <span v-else class="goal-thumb">{{ row.title.slice(0, 1) }}</span>
       </template>
     </el-table-column>

@@ -6,8 +6,10 @@ import 'element-plus/dist/index.css'
 import './styles/index.less'
 import App from './App.vue'
 import router from './router'
+import mediaPreviewDirective from './directives/mediaPreview'
 
 createApp(App)
   .use(createPinia())
   .use(router)
+  .directive('media-preview', mediaPreviewDirective)
   .mount('#app')

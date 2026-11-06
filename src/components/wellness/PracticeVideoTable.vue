@@ -19,62 +19,66 @@ const statusText = {
 </script>
 
 <template>
-  <el-table class="video-table" border :data="videos" row-key="id">
-    <el-table-column label="视频" width="90">
-      <template #default="{ row }">
-        <span class="video-tile">
-          <el-icon :size="12"><VideoPlay /></el-icon>
-          视频
-        </span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="title" label="视频标题" min-width="170" show-overflow-tooltip />
-    <el-table-column label="难度 · 时长 · 形式" min-width="165">
-      <template #default="{ row }">
-        {{ row.difficulty }} · {{ row.duration }}分钟 · {{ row.form }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="intro" label="视频简介" min-width="290" show-overflow-tooltip />
-    <el-table-column label="播放次数" min-width="90">
-      <template #default="{ row }">
-        {{ row.plays.toLocaleString('en-US') }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="createdAt" label="新增时间" min-width="165" />
-    <el-table-column label="展示状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="230" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-        <ActionLink
-          v-if="row.status === 'shown'"
-          :icon="Hide"
-          text="隐藏"
-          @click="emit('toggle', row)"
-        />
-        <template v-else>
-          <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
-          <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="video-table" border :data="videos" row-key="id">
+      <el-table-column label="视频" width="90">
+        <template #default="{ row }">
+          <span class="video-tile" v-media-preview="{ url: row.videoUrl, type: 'video' }">
+            <el-icon :size="12"><VideoPlay /></el-icon>
+            视频
+          </span>
         </template>
-      </template>
-    </el-table-column>
-  </el-table>
+      </el-table-column>
+      <el-table-column prop="title" label="视频标题" min-width="170" show-overflow-tooltip />
+      <el-table-column label="难度 · 时长 · 形式" min-width="165">
+        <template #default="{ row }">
+          {{ row.difficulty }} · {{ row.duration }}分钟 · {{ row.form }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="intro" label="视频简介" min-width="290" show-overflow-tooltip />
+      <el-table-column label="播放次数" min-width="90">
+        <template #default="{ row }">
+          {{ row.plays.toLocaleString('en-US') }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="createdAt" label="新增时间" min-width="165" />
+      <el-table-column label="展示状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="230" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+          <ActionLink
+            v-if="row.status === 'shown'"
+            :icon="Hide"
+            text="隐藏"
+            @click="emit('toggle', row)"
+          />
+          <template v-else>
+            <ActionLink :icon="View" text="恢复展示" @click="emit('toggle', row)" />
+            <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+          </template>
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

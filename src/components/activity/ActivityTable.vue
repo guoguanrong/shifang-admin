@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { Bottom, Delete, Edit, Top } from '@element-plus/icons-vue'
 import ActionLink from '../common/ActionLink.vue'
 
@@ -10,6 +11,13 @@ defineProps({
 
 // 事件说明：edit 打开新增/编辑弹窗，toggle 上架/下架，remove 删除，page-change 由父级切换分页。
 const emit = defineEmits(['edit', 'toggle', 'remove', 'page-change'])
+
+// 图片为 http 外链时可能被浏览器按混合内容拦截，加载失败回退到文字占位。
+const brokenImages = ref(new Set())
+
+function markImageBroken(id) {
+  brokenImages.value = new Set(brokenImages.value).add(id)
+}
 
 // 活动类型字典：group 集体活动 / appointment 专场预约。
 const typeText = {
@@ -33,79 +41,90 @@ function formatEnrollment(activity) {
 </script>
 
 <template>
-  <el-table class="activity-table" border :data="activities" row-key="id">
-    <el-table-column label="活动图片" width="90">
-      <template #default="{ row }">
-        <img v-if="row.images[0]?.url" :src="row.images[0].url" class="activity-thumb-img" alt="活动图片" />
-        <span v-else class="activity-thumb">{{ row.title.slice(0, 1) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="title" label="活动标题" min-width="190" show-overflow-tooltip />
-    <el-table-column prop="subtitle" label="活动副标题" min-width="160" show-overflow-tooltip />
-    <el-table-column label="活动标签" min-width="170">
-      <template #default="{ row }">
-        <div class="tag-cell">
-          <span v-for="tag in row.tags" :key="tag">{{ tag }}</span>
-        </div>
-      </template>
-    </el-table-column>
-    <el-table-column label="道会类型" min-width="90">
-      <template #default="{ row }">
-        <span class="soft-tag type">{{ typeText[row.type] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="timeText" label="道会时间" min-width="165" show-overflow-tooltip />
-    <el-table-column prop="location" label="道会地点" min-width="150" show-overflow-tooltip />
-    <el-table-column prop="joinWay" label="参加方式" min-width="130" show-overflow-tooltip />
-    <el-table-column label="报名人数" min-width="85">
-      <template #default="{ row }">
-        {{ formatEnrollment(row) }}
-      </template>
-    </el-table-column>
-    <el-table-column prop="deadline" label="报名截止" min-width="145" show-overflow-tooltip />
-    <el-table-column label="活动状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="上架状态" min-width="90">
-      <template #default="{ row }">
-        <span :class="['soft-tag', row.listed ? 'on' : 'off']">{{ row.listed ? '上架' : '暂不上架' }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="200" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-        <ActionLink
-          v-if="row.status !== 'ended'"
-          :icon="row.listed ? Bottom : Top"
-          :text="row.listed ? '下架' : '上架'"
-          :danger="row.listed"
-          @click="emit('toggle', row)"
-        />
-        <ActionLink
-          v-if="!row.listed"
-          :icon="Delete"
-          text="删除"
-          danger
-          @click="emit('remove', row)"
-        />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="activity-table" border :data="activities" row-key="id">
+      <el-table-column label="活动图片" width="90">
+        <template #default="{ row }">
+          <img
+            v-if="row.images[0]?.url && !brokenImages.has(row.id)"
+            v-media-preview="(row.images ?? []).map((item) => item.url).filter(Boolean)"
+            :src="row.images[0].url"
+            class="activity-thumb-img"
+            alt="活动图片"
+            @error="markImageBroken(row.id)"
+          />
+          <span v-else class="activity-thumb">{{ row.title.slice(0, 1) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="title" label="活动标题" min-width="190" show-overflow-tooltip />
+      <el-table-column prop="subtitle" label="活动副标题" min-width="160" show-overflow-tooltip />
+      <el-table-column label="活动标签" min-width="170">
+        <template #default="{ row }">
+          <div class="tag-cell">
+            <span v-for="tag in row.tags" :key="tag">{{ tag }}</span>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="道会类型" min-width="90">
+        <template #default="{ row }">
+          <span class="soft-tag type">{{ typeText[row.type] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="timeText" label="道会时间" min-width="165" show-overflow-tooltip />
+      <el-table-column prop="location" label="道会地点" min-width="150" show-overflow-tooltip />
+      <el-table-column prop="joinWay" label="参加方式" min-width="130" show-overflow-tooltip />
+      <el-table-column label="报名人数" min-width="85">
+        <template #default="{ row }">
+          {{ formatEnrollment(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="deadline" label="报名截止" min-width="145" show-overflow-tooltip />
+      <el-table-column label="活动状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.status || 'pending']">{{ statusText[row.status] || '未设置' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="上架状态" min-width="90">
+        <template #default="{ row }">
+          <span :class="['soft-tag', row.listed ? 'on' : 'off']">{{ row.listed ? '上架' : '暂不上架' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="200" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+          <ActionLink
+            v-if="row.status !== 'ended'"
+            :icon="row.listed ? Bottom : Top"
+            :text="row.listed ? '下架' : '上架'"
+            :danger="row.listed"
+            @click="emit('toggle', row)"
+          />
+          <ActionLink
+            v-if="!row.listed"
+            :icon="Delete"
+            text="删除"
+            danger
+            @click="emit('remove', row)"
+          />
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

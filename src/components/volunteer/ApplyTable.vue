@@ -20,46 +20,50 @@ const statusText = {
 </script>
 
 <template>
-  <el-table class="apply-table" border :data="applications" row-key="id" @selection-change="emit('selection-change', $event)">
-    <el-table-column type="selection" width="42" />
-    <el-table-column prop="id" label="申请ID" min-width="90" />
-    <el-table-column prop="name" label="善信姓名" min-width="100" />
-    <el-table-column prop="phone" label="联络手机" min-width="125" />
-    <el-table-column prop="post" label="申请岗位" min-width="95" />
-    <el-table-column prop="availableTime" label="可服务时间" min-width="90" />
-    <el-table-column prop="appliedAt" label="申请时间" min-width="165" />
-    <el-table-column prop="declaration" label="申请留言" min-width="300" show-overflow-tooltip>
-      <template #default="{ row }">
-        {{ row.declaration || '—' }}
-      </template>
-    </el-table-column>
-    <el-table-column label="状态" min-width="130">
-      <template #default="{ row }">
-        <div class="status-cell">
-          <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
-          <span v-if="row.status === 'rejected' && row.rejectReason" class="reject-reason">拒绝理由：{{ row.rejectReason }}</span>
-        </div>
-      </template>
-    </el-table-column>
-    <el-table-column label="操作" width="95" fixed="right">
-      <template #default="{ row }">
-        <ActionLink v-if="row.status === 'pending'" :icon="DocumentChecked" text="审核" @click="emit('review', row)" />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承，多根结构会导致指令失效。 -->
+  <div class="table-block">
+    <el-table class="apply-table" border :data="applications" row-key="id" @selection-change="emit('selection-change', $event)">
+      <el-table-column type="selection" width="42" />
+      <el-table-column prop="id" label="申请ID" min-width="90" />
+      <el-table-column prop="name" label="善信姓名" min-width="100" />
+      <el-table-column prop="phone" label="联络手机" min-width="125" />
+      <el-table-column prop="post" label="申请岗位" min-width="95" />
+      <el-table-column prop="availableTime" label="可服务时间" min-width="90" />
+      <el-table-column prop="appliedAt" label="申请时间" min-width="165" />
+      <el-table-column prop="declaration" label="申请留言" min-width="300" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.declaration || '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" min-width="130">
+        <template #default="{ row }">
+          <div class="status-cell">
+            <span :class="['soft-tag', row.status]">{{ statusText[row.status] }}</span>
+            <span v-if="row.status === 'rejected' && row.rejectReason" class="reject-reason">拒绝理由：{{ row.rejectReason }}</span>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="95" fixed="right">
+        <template #default="{ row }">
+          <ActionLink v-if="row.status === 'pending'" :icon="DocumentChecked" text="审核" @click="emit('review', row)" />
+        </template>
+      </el-table-column>
+    </el-table>
 
-  <footer class="table-footer">
-    <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
-    <el-pagination
-      :current-page="currentPage"
-      background
-      layout="prev, pager, next"
-      :page-size="10"
-      :pager-count="5"
-      :total="total"
-      @current-change="emit('page-change', $event)"
-    />
-  </footer>
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+
+  </div>
 </template>
 
 <style scoped lang="less">

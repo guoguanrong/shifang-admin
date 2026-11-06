@@ -20,7 +20,7 @@ export const staticMenuGroups = [
   ] },
   { id: 'donations', title: '捐赠管理', children: [
     { id: 'donation-records', title: '捐赠记录', path: '/donations/records', name: 'DonationRecords', component: 'DonationRecordListView', icon: 'Wallet' },
-    { id: 'donation-goals', title: '捐赠目标', path: '/donations/goals', name: 'DonationGoals', component: 'DonationGoalListView', icon: 'Flag' },
+    { id: 'donation-goals', title: '捐赠内容', path: '/donations/goals', name: 'DonationGoals', component: 'DonationGoalListView', icon: 'Flag' },
     { id: 'donation-items', title: '物品列表', path: '/donations/items', name: 'DonationItems', component: 'DonationItemListView', icon: 'Goods' },
   ] },
   { id: 'business', title: '祈福管理', children: [

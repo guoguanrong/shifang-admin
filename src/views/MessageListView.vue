@@ -430,9 +430,11 @@ async function submitMessage() {
             </div>
             <label v-if="form.images.length < MAX_IMAGES" class="image-add">
               <input type="file" accept="image/*" multiple :disabled="uploading || saving" @change="onImagesChange" />
-              <span class="add-icon">＋</span>
-              <span>上传图片</span>
-              <em>{{ form.images.length }}/{{ MAX_IMAGES }}</em>
+              <span class="add-body">
+                <span class="add-icon">＋</span>
+                <span class="add-text">上传图片</span>
+                <em>{{ form.images.length }}/{{ MAX_IMAGES }}</em>
+              </span>
             </label>
           </div>
           <p class="field-tip">{{ uploading ? '图片上传中…' : '图片用于前台寄语卡片轮播,最多 6 张' }}</p>
@@ -560,81 +562,6 @@ async function submitMessage() {
     max-width: 100%;
     max-height: 220px;
     border-radius: var(--admin-radius-sm);
-  }
-}
-
-.image-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.image-tile {
-  position: relative;
-  width: 96px;
-  height: 72px;
-  border-radius: var(--admin-radius-sm);
-  overflow: hidden;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .tile-remove {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    display: grid;
-    place-items: center;
-    color: var(--admin-text-secondary);
-    font-size: 12px;
-    font-style: normal;
-    background: var(--admin-surface);
-    border-radius: 50%;
-    cursor: pointer;
-
-    &:hover {
-      color: var(--admin-danger);
-    }
-  }
-}
-
-.image-add {
-  width: 96px;
-  height: 72px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--admin-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  border: 1px dashed var(--admin-border-strong);
-  border-radius: var(--admin-radius-sm);
-
-  &:hover {
-    color: var(--admin-primary);
-    border-color: var(--admin-primary);
-  }
-
-  input[type='file'] {
-    display: none;
-  }
-
-  .add-icon {
-    font-size: 16px;
-  }
-
-  em {
-    color: var(--admin-text-muted);
-    font-size: 11px;
-    font-style: normal;
   }
 }
 

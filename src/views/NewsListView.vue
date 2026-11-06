@@ -322,8 +322,10 @@ async function submitNews() {
             </div>
             <label v-if="form.images.length < MAX_IMAGES" class="image-add">
               <input type="file" accept="image/*" multiple @change="onImagesChange" />
-              <span class="add-icon">＋</span>
-              <span>上传</span>
+              <span class="add-body">
+                <span class="add-icon">＋</span>
+                <span class="add-text">上传</span>
+              </span>
             </label>
           </div>
           <p class="field-tip">图片用于前台动态卡片展示,最多 6 张</p>
@@ -405,75 +407,6 @@ async function submitNews() {
 
   :deep(.el-form-item__content) {
     display: block;
-  }
-}
-
-.image-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.image-tile {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: var(--admin-radius-sm);
-  overflow: hidden;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .tile-remove {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    display: grid;
-    place-items: center;
-    color: var(--admin-text-secondary);
-    font-size: 12px;
-    font-style: normal;
-    background: var(--admin-surface);
-    border-radius: 50%;
-    cursor: pointer;
-
-    &:hover {
-      color: var(--admin-danger);
-    }
-  }
-}
-
-.image-add {
-  width: 80px;
-  height: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--admin-text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  border: 1px dashed var(--admin-border-strong);
-  border-radius: var(--admin-radius-sm);
-
-  &:hover {
-    color: var(--admin-primary);
-    border-color: var(--admin-primary);
-  }
-
-  input[type='file'] {
-    display: none;
-  }
-
-  .add-icon {
-    font-size: 14px;
   }
 }
 

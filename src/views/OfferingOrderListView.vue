@@ -139,7 +139,7 @@ function exportOrders() {
       </div>
 
       <div class="preview-stage">
-        <img v-if="previewImage" :src="previewImage" alt="供奉图片" />
+        <img v-if="previewImage" v-media-preview="previewImage" :src="previewImage" alt="供奉图片" />
         <template v-else>
           <strong>暂无供奉图片</strong>
           <p>接口未提供订单图片上传能力，仅展示下单时已生成的 fileUrl</p>
