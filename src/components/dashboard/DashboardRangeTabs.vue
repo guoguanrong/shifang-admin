@@ -1,10 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 
-// modelValue 为当前范围（today / yesterday / 7d / 30d / custom），dateRange 是自定义区间。
+// modelValue 为当前范围，dateRange 是自定义区间。
+// mode='daily'（默认）：today / yesterday / 7d / 30d（对应接口 rangeType 1-4，custom=5）
+// mode='monthly'：month / lastMonth（对应交易类接口 rangeType 1-2，custom=3）
 const props = defineProps({
   modelValue: { type: String, required: true },
   dateRange: { type: Array, default: () => [] },
+  mode: { type: String, default: 'daily' },
 })
 const emit = defineEmits(['update:modelValue', 'update:dateRange'])
 
@@ -17,13 +20,20 @@ const range = computed({
   },
 })
 
-// 快捷范围按钮。
-const options = [
-  { value: 'today', label: '今日' },
-  { value: 'yesterday', label: '昨日' },
-  { value: '7d', label: '近7日' },
-  { value: '30d', label: '近30日' },
-]
+// 快捷范围按钮，按模式切换（后端 rangeType 枚举见 dashboardApi.js）。
+const options = computed(() => (
+  props.mode === 'monthly'
+    ? [
+        { value: 'month', label: '本月' },
+        { value: 'lastMonth', label: '上月' },
+      ]
+    : [
+        { value: 'today', label: '今日' },
+        { value: 'yesterday', label: '昨日' },
+        { value: '7d', label: '近7日' },
+        { value: '30d', label: '近30日' },
+      ]
+))
 </script>
 
 <template>

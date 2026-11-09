@@ -25,9 +25,6 @@ const emit = defineEmits(['selection-change', 'toggle-status', 'detail', 'page-c
       <el-table-column label="捐款次数" min-width="90">
         <template #default="{ row }">{{ row.donateCount ?? '—' }}</template>
       </el-table-column>
-      <el-table-column label="捐物次数" min-width="90">
-        <template #default="{ row }">{{ row.donateItemCount ?? '—' }}</template>
-      </el-table-column>
       <el-table-column label="共建十方次数" min-width="110">
         <template #default="{ row }">{{ row.coBuildCount ?? '—' }}</template>
       </el-table-column>

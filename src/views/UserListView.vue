@@ -139,12 +139,12 @@ async function batchFreeze() {
 function exportUsers() {
   const exportRows = selection.value.length ? selection.value : users.value
   const headers = [
-    '邮箱', '善信名称', '用户ID', '注册时间', '捐款金额', '捐款次数', '捐物次数',
+    '邮箱', '善信名称', '用户ID', '注册时间', '捐款金额', '捐款次数',
     '共建十方次数', '点灯次数', '神像供奉次数', '点灯金额', '供奉金额', '来源渠道', '状态',
   ]
   const lines = exportRows.map((user) => [
     user.email, user.nickname, user.id, user.registeredAt, user.donateAmount,
-    user.donateCount ?? '—', user.donateItemCount ?? '—', user.coBuildCount ?? '—',
+    user.donateCount ?? '—', user.coBuildCount ?? '—',
     user.lightCount ?? '—', user.worshipCount ?? '—', user.lightAmount, user.worshipAmount,
     user.source, user.status === 'normal' ? '正常' : '冻结中',
   ])

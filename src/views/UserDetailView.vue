@@ -41,8 +41,6 @@ const detailItems = computed(() => {
     { label: '账号实名', value: memberData.realNameAuth === true ? '已实名' : '未实名' },
     { label: '捐款金额', value: money(memberData.totalDonate) },
     { label: '捐款次数', value: count(memberData.donateCount) },
-    // 捐物次数：接口暂未返回该字段（捐款与捐物目前合并计入 donateCount）。
-    { label: '捐物次数', value: count(memberData.donateItemCount) },
     { label: '共建十方次数', value: count(memberData.donateCount) },
     { label: '点灯次数', value: count(memberData.lightCount) },
     { label: '神像供奉次数', value: count(memberData.worshipCount) },

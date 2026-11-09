@@ -52,9 +52,7 @@ export function mapMemberToRow(member) {
     lightAmount: formatMoney(member.totalLight),
     worshipAmount: formatMoney(member.totalWorship),
     donateCount: formatCount(member.donateCount),
-    // 捐物次数：接口暂未返回该字段（捐钱与捐物目前合并计入 donateCount）。
-    donateItemCount: formatCount(member.donateItemCount),
-    // 共建十方次数 = 捐款 + 捐物次数的合并统计，当前即接口的 donateCount。
+    // 共建十方次数：donateCount 口径为捐款+捐物合并统计（后端确认），与捐款次数同源展示。
     coBuildCount: formatCount(member.donateCount),
     lightCount: formatCount(member.lightCount),
     worshipCount: formatCount(member.worshipCount),
