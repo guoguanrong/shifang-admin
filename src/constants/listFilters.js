@@ -157,3 +157,10 @@ export function createOperationLogFilters() {
     endDate: '',
   }
 }
+
+export function createMenuFilters() {
+  return {
+    title: '',
+    status: '',
+  }
+}

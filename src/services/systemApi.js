@@ -80,7 +80,33 @@ export function setSysRoleMenu(data) {
 
 // ---------- system-菜单 ----------
 
+// 当前登录用户的路由树：GET 无入参，返回 RouterVo[]（name/path/component/meta{title,icon...}/children）。
+// 用于登录后生成本人可见的菜单与路由；不含菜单 id/type/perms，不用于菜单管理或角色授权。
+export function getSysMenuRoutes() {
+  return http.get('/menu/routes')
+}
+
 // 菜单列表：BaseQuery 分页，返回 SysMenuVo[]（含 children 子级）。
 export function getSysMenuList(params) {
   return http.post('/menu/list', params)
+}
+
+// 菜单详情：编辑时按 id 取完整字段。
+export function getSysMenuById(id) {
+  return http.get(`/menu/get/${id}`)
+}
+
+// 新增/修改菜单：SysMenu（required: title、type），修改时带 id。
+// type 1.目录 2.菜单 3.按钮；status 0.停用 1.正常；hidden true.隐藏。
+export function saveSysMenu(data) {
+  return http.post('/menu/save', data)
+}
+
+export function updateSysMenu(data) {
+  return http.post('/menu/update', data)
+}
+
+// 批量/级联删除：body 为菜单 id 数组。
+export function deleteSysMenu(ids) {
+  return http.post('/menu/delete', ids)
 }

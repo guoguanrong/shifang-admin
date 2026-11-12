@@ -52,6 +52,7 @@ export const staticMenuGroups = [
     { id: 'role-permissions', title: '角色权限', path: '/permissions/roles', name: 'RolePermissions', component: 'RolePermissionsView', icon: 'Key' },
   ] },
   { id: 'system', title: '系统管理', children: [
+    { id: 'menu-management', title: '菜单管理', path: '/system/menus', name: 'MenuManagement', component: 'MenuManagementView', icon: 'Menu' },
     { id: 'operation-logs', title: '操作日志', path: '/system/logs', name: 'OperationLogs', component: 'OperationLogListView', icon: 'Clock' },
   ] },
 ]

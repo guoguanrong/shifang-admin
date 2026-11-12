@@ -3,11 +3,13 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { useMenuStore } from '../../stores/menu'
 import { useTabsStore } from '../../stores/tabs'
 import { logout as logoutApi } from '../../services/authApi'
 import AppSidebar from './AppSidebar.vue'
 
 const authStore = useAuthStore()
+const menuStore = useMenuStore()
 const tabsStore = useTabsStore()
 const route = useRoute()
 const router = useRouter()
@@ -76,6 +78,8 @@ async function logout() {
     // 服务端注销失败（如网络异常）时仍继续本地登出。
   }
   authStore.logout()
+  // 还原静态菜单并清掉已加载标记，切换账号后重新拉取该账号的路由树。
+  menuStore.resetMenuGroups()
   tabsStore.resetTabs()
   await router.replace('/login')
 }

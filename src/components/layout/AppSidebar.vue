@@ -44,6 +44,7 @@ const iconMap = {
   Goods,
   Key,
   MagicStick,
+  Menu,
   Monitor,
   Notification,
   Postcard,

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { staticMenuGroups } from '../mock/menus'
+import { useMenuStore } from '../stores/menu'
 
 // 菜单配置中的 component 字段 → 页面组件的映射（懒加载）。
 // 新增业务页面时在此登记，未登记或暂未实现的页面统一回退到 PlaceholderView。
@@ -23,6 +24,7 @@ const componentMap = {
   NewsListView: () => import('../views/NewsListView.vue'),
   CloudSupervisionListView: () => import('../views/CloudSupervisionListView.vue'),
   OperationLogListView: () => import('../views/OperationLogListView.vue'),
+  MenuManagementView: () => import('../views/MenuManagementView.vue'),
   AccountManagementView: () => import('../views/AccountManagementView.vue'),
   RolePermissionsView: () => import('../views/RolePermissionsView.vue'),
   PlaceholderView: () => import('../views/PlaceholderView.vue'),
@@ -96,6 +98,31 @@ export function isMenuEnabled(menuId) {
   return !DISABLED_MENU_IDS.has(menuId)
 }
 
+function normalizeMenuPath(path) {
+  const text = String(path ?? '').trim()
+  if (!text) return ''
+  const withSlash = text.startsWith('/') ? text : `/${text}`
+  return withSlash.replace(/\/+$/, '') || '/'
+}
+
+// 动态菜单下的访问白名单：菜单页按 path 精确匹配；
+// 详情页（如 /users/:id）按 meta.activeMenuPath 归属的列表页判断，子路径继承父级权限。
+function isPathAllowed(to, menuGroups) {
+  const allowed = new Set(
+    menuGroups.flatMap((group) => group.children.map((item) => normalizeMenuPath(item.path))).filter(Boolean),
+  )
+  if (!allowed.size) return true
+
+  const target = normalizeMenuPath(to.path)
+  if (allowed.has(target)) return true
+  const parent = normalizeMenuPath(to.meta.activeMenuPath)
+  if (parent && allowed.has(parent)) return true
+  for (const path of allowed) {
+    if (target.startsWith(`${path}/`)) return true
+  }
+  return false
+}
+
 // "暂未开发"弹窗：防重复弹出。
 let comingSoonVisible = false
 function notifyComingSoon() {
@@ -121,17 +148,54 @@ function getSessionToken() {
   }
 }
 
-// 全局守卫：已登录访问登录页 → 回后台；未登录访问受保护页面 → 去登录并带上回跳地址；
-// 黑名单内的模块（菜单点击或地址栏直达）提示暂未开发并取消导航。
+// 全局守卫：登录态校验 → 触发（不等待）当前用户菜单加载 → 黑名单/白名单校验。
+// 守卫必须保持同步：在守卫里 await 接口会让导航一直悬在过渡的初始态，接口慢时表现为白屏。
+// 菜单在后台加载，完成后重建路由并校正当前页面；之后的导航由白名单同步拦截。
+let hookedMenuLoad = null
+
 router.beforeEach((to) => {
   const token = getSessionToken()
   if (to.meta.public && token) return { path: '/dashboard' }
   if (!to.meta.public && !token) {
     return { name: 'Login', query: { redirect: to.fullPath } }
   }
+  if (!token) return true
+
+  const menuStore = useMenuStore()
+  if (!menuStore.loaded) {
+    const loading = menuStore.loadMenuGroups()
+    // 加载期间可能触发多次导航，只对同一个加载 Promise 挂钩一次校正。
+    if (hookedMenuLoad !== loading) {
+      hookedMenuLoad = loading
+      loading.then(() => {
+        if (!menuStore.dynamic) return
+        const current = router.currentRoute.value
+        const isCatchAll = current.matched.some((record) => String(record.path).includes('pathMatch'))
+        if (isCatchAll || isPathAllowed(current, menuStore.menuGroups)) return
+        const firstPath = menuStore.menuGroups.flatMap((group) => group.children.map((item) => item.path))[0]
+        if (firstPath) {
+          ElMessage.warning('您没有访问该页面的权限')
+          router.replace(firstPath)
+        }
+      })
+    }
+  }
+
   if (to.meta.menuId && !isMenuEnabled(to.meta.menuId)) {
     notifyComingSoon()
     return false
+  }
+
+  if (menuStore.dynamic) {
+    // 通配路由（未注册页面）自身会 redirect 到首页，不在这里重复提示。
+    const isCatchAll = to.matched.some((record) => String(record.path).includes('pathMatch'))
+    if (!isCatchAll && !isPathAllowed(to, menuStore.menuGroups)) {
+      const firstPath = menuStore.menuGroups.flatMap((group) => group.children.map((item) => item.path))[0]
+      if (firstPath) {
+        ElMessage.warning('您没有访问该页面的权限')
+        return { path: firstPath, replace: true }
+      }
+    }
   }
   return true
 })
