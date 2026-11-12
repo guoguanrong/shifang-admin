@@ -4,9 +4,11 @@ import ActionLink from '../common/ActionLink.vue'
 
 defineProps({
   items: { type: Array, required: true },
+  total: { type: Number, default: 0 },
+  currentPage: { type: Number, default: 1 },
 })
 
-const emit = defineEmits(['edit', 'toggle', 'remove'])
+const emit = defineEmits(['edit', 'toggle', 'remove', 'page-change'])
 
 // 状态字典：on 上架 / off 下架。
 const statusText = {
@@ -16,45 +18,61 @@ const statusText = {
 </script>
 
 <template>
-  <el-table class="item-table" border :data="items" row-key="id">
-    <el-table-column label="物品图片" min-width="100">
-      <template #default="{ row }">
-        <img v-if="row.image" v-media-preview="row.image" :src="row.image" class="item-thumb-img" alt="物品图片" />
-        <span v-else class="item-thumb">{{ row.name.slice(0, 1) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="name" label="物品名称" min-width="180" />
-    <el-table-column label="类型" min-width="80">
-      <template #default="{ row }">
-        <span>{{ Number(row.type) === 1 ? '捐钱' : Number(row.type) === 2 ? '捐物' : row.type }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="usage" label="物品用途" min-width="140" />
-    <el-table-column prop="unit" label="单位" min-width="70" />
-    <el-table-column label="价格" min-width="85">
-      <template #default="{ row }">
-        ${{ row.price }}
-      </template>
-    </el-table-column>
-    <el-table-column label="状态" min-width="85">
-      <template #default="{ row }">
-        <span :class="['soft-tag', Number(row.status) === 1 ? 'on' : 'off']">{{ statusText[Number(row.status) === 1 ? 'on' : 'off'] }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column prop="createdAt" label="新增时间" min-width="150" />
-    <el-table-column label="操作" width="190" fixed="right">
-      <template #default="{ row }">
-        <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
-        <ActionLink
-          :icon="Number(row.status) === 1 ? Bottom : Top"
-          :text="Number(row.status) === 1 ? '下架' : '上架'"
-          :danger="Number(row.status) === 1"
-          @click="emit('toggle', row)"
-        />
-        <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
-      </template>
-    </el-table-column>
-  </el-table>
+  <!-- 单根容器：视图层的 v-loading 依赖根元素继承。 -->
+  <div class="table-block">
+    <el-table class="item-table" border :data="items" row-key="id">
+      <el-table-column label="物品图片" min-width="100">
+        <template #default="{ row }">
+          <img v-if="row.image" v-media-preview="row.image" :src="row.image" class="item-thumb-img" alt="物品图片" />
+          <span v-else class="item-thumb">{{ row.name.slice(0, 1) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="name" label="物品名称" min-width="180" />
+      <el-table-column label="类型" min-width="80">
+        <template #default="{ row }">
+          <span>{{ Number(row.type) === 1 ? '捐钱' : Number(row.type) === 2 ? '捐物' : row.type }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="usage" label="物品用途" min-width="140" />
+      <el-table-column prop="unit" label="单位" min-width="70" />
+      <el-table-column label="价格" min-width="85">
+        <template #default="{ row }">
+          ${{ row.price }}
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" min-width="85">
+        <template #default="{ row }">
+          <span :class="['soft-tag', Number(row.status) === 1 ? 'on' : 'off']">{{ statusText[Number(row.status) === 1 ? 'on' : 'off'] }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="createdAt" label="新增时间" min-width="150" />
+      <el-table-column label="操作" width="190" fixed="right">
+        <template #default="{ row }">
+          <ActionLink :icon="Edit" text="编辑" @click="emit('edit', row)" />
+          <ActionLink
+            :icon="Number(row.status) === 1 ? Bottom : Top"
+            :text="Number(row.status) === 1 ? '下架' : '上架'"
+            :danger="Number(row.status) === 1"
+            @click="emit('toggle', row)"
+          />
+          <ActionLink :icon="Delete" text="删除" danger @click="emit('remove', row)" />
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <footer class="table-footer">
+      <span>共 {{ total }} 条&nbsp; · &nbsp;每页 10 条</span>
+      <el-pagination
+        :current-page="currentPage"
+        background
+        layout="prev, pager, next"
+        :page-size="10"
+        :pager-count="5"
+        :total="total"
+        @current-change="emit('page-change', $event)"
+      />
+    </footer>
+  </div>
 </template>
 
 <style scoped lang="less">
@@ -112,6 +130,30 @@ const statusText = {
 
   &.on { color: var(--admin-success); background: var(--admin-success-light); }
   &.off { color: var(--admin-text-secondary); background: var(--admin-neutral-light); }
+}
+
+.table-footer {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  color: var(--admin-text-secondary);
+  font-size: 12px;
+
+  :deep(.el-pagination.is-background .btn-prev),
+  :deep(.el-pagination.is-background .btn-next),
+  :deep(.el-pagination.is-background .el-pager li) {
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--admin-radius-xs);
+  }
+
+  :deep(.el-pagination.is-background .el-pager li.is-active) {
+    color: var(--admin-text-inverse);
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+  }
 }
 
 </style>

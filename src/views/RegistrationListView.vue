@@ -5,12 +5,11 @@ import RegistrationFilterBar from '../components/activity/RegistrationFilterBar.
 import RegistrationTable from '../components/activity/RegistrationTable.vue'
 import { createRegistrationFilters } from '../constants/listFilters'
 import { getActivityRegisterList } from '../services/businessApi'
+import { exportActivityRegistrations } from '../services/exportApi'
 import { getRegisterList, mapRegistration } from '../utils/registrationDisplay'
 import { downloadCsv } from '../utils/csv'
 
 const PAGE_SIZE = 10
-const EXPORT_PAGE_SIZE = 200
-const MAX_EXPORT_PAGES = 50
 
 // 报名类型字典：与 RegistrationTable 保持一致。
 const typeText = {
@@ -24,18 +23,23 @@ const selection = ref([])
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 
-// 与 ActivityRegisterDTO 对齐：searchKey 关键词、mobile 善信手机号、报名时间区间。
-function buildParams(page = currentPage.value, pageSize = PAGE_SIZE) {
+// /activityRegister/list 与 /activityRegister/export 使用同一份 ActivityRegisterDTO：
+// searchKey 关键词、mobile 善信手机号、报名时间区间。
+function buildQuery() {
   const { searchKey, mobile, startDate, endDate } = filters.value
   return {
-    page,
-    pageSize,
     searchKey: searchKey.trim() || undefined,
     mobile: mobile.trim() || undefined,
     startTime: startDate ? `${startDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined,
   }
+}
+
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
 }
 
 async function loadRegistrations() {
@@ -78,48 +82,40 @@ function changePage(page) {
   loadRegistrations()
 }
 
-// 服务端分页后，导出全量需要按当前筛选条件逐页拉取。
-async function fetchAllRegistrations() {
-  const rows = []
-  let page = 1
-  while (page <= MAX_EXPORT_PAGES) {
-    const result = getRegisterList(await getActivityRegisterList(buildParams(page, EXPORT_PAGE_SIZE)))
-    rows.push(...result.list)
-    if (!result.list.length) break
-    const hasTotal = Number.isFinite(result.totalRow) && result.totalRow > 0
-    const hasPages = Number.isFinite(result.totalPage) && result.totalPage > 0
-    if (hasTotal && rows.length >= result.totalRow) break
-    if (hasPages && page >= result.totalPage) break
-    // 后端可能限制 pageSize，只有总数与页数都缺失时才按「不满一页」收尾。
-    if (!hasTotal && !hasPages && result.list.length < EXPORT_PAGE_SIZE) break
-    page += 1
-  }
-  return rows.map(mapRegistration)
+// 勾选行走前端 CSV：/activityRegister/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedRegistrations() {
+  const headers = ['活动标题', '道会时间', '道会类型', '善信姓名', '善信手机', '随行人数', '凭证号', '祈福心愿', '报名时间']
+  const rows = selection.value.map((item) => [
+    item.activityTitle,
+    item.activityTime,
+    typeText[item.type],
+    item.name,
+    item.phone,
+    `${item.companions} 人`,
+    item.cert || '—',
+    item.wish,
+    item.registeredAt,
+  ])
+  downloadCsv('报名名单.csv', headers, rows)
+  ElMessage.success(`报名名单已导出（${selection.value.length} 条）`)
 }
 
-// 导出名单：有勾选导勾选，否则导出当前筛选条件下的全部记录。
+// 未勾选时调用 /activityRegister/export，服务端按筛选条件导出全量报名记录。
 async function exportRegistrations() {
-  loading.value = true
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedRegistrations()
+    return
+  }
+
+  exporting.value = true
   try {
-    const exportRows = selection.value.length ? selection.value : await fetchAllRegistrations()
-    const headers = ['活动标题', '道会时间', '道会类型', '善信姓名', '善信手机', '随行人数', '凭证号', '祈福心愿', '报名时间']
-    const rows = exportRows.map((item) => [
-      item.activityTitle,
-      item.activityTime,
-      typeText[item.type],
-      item.name,
-      item.phone,
-      `${item.companions} 人`,
-      item.cert || '—',
-      item.wish,
-      item.registeredAt,
-    ])
-    downloadCsv('报名名单.csv', headers, rows)
-    ElMessage.success(`报名名单已导出（${exportRows.length} 条）`)
+    await exportActivityRegistrations(buildQuery(), '报名名单')
+    ElMessage.success('报名名单已导出')
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '导出报名名单失败')
   } finally {
-    loading.value = false
+    exporting.value = false
   }
 }
 </script>
@@ -136,7 +132,7 @@ async function exportRegistrations() {
     <section class="table-card">
       <div class="table-toolbar">
         <span><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button class="export-button" :disabled="loading" @click="exportRegistrations">导出名单</el-button>
+        <el-button class="export-button" :loading="exporting" :disabled="loading" @click="exportRegistrations">导出名单</el-button>
       </div>
 
       <RegistrationTable

@@ -169,8 +169,10 @@ async function handleSave(payload) {
       // 接口的 null 表示「未设置」，而表单会回填默认值；只提交真正改动的字段，
       // 避免打开编辑就保存把 status/day/startHour 等空值写成默认值。
       const originalBody = currentActivity.value ? buildActivityPayload(currentActivity.value) : {}
+      // yigui 等字段现在是数组/对象，按内容序列化后再比较，避免引用不同被误判为已改动。
+      const comparable = (value) => (value && typeof value === 'object' ? JSON.stringify(value) : value)
       const changes = Object.fromEntries(
-        Object.entries(body).filter(([key, value]) => !Object.is(value, originalBody[key])),
+        Object.entries(body).filter(([key, value]) => !Object.is(comparable(value), comparable(originalBody[key]))),
       )
       if (Object.keys(changes).length) {
         await updateActivity({ id: editingId.value, ...changes })
@@ -179,7 +181,12 @@ async function handleSave(payload) {
       }
       ElMessage.success('道会已更新')
     } else {
-      await saveActivity(body)
+      // 新增时省略空值字段：后端对 null 的日期/数字字段可能直接解引用导致 1002。
+      // limitUser 的 null 表示「不限人数」（文档允许），单独保留。
+      const createBody = Object.fromEntries(
+        Object.entries(body).filter(([key, value]) => key === 'limitUser' || (value !== null && value !== undefined)),
+      )
+      await saveActivity(createBody)
       ElMessage.success('道会已发布')
       currentPage.value = 1
       await loadActivities()

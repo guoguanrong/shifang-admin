@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import DeityOfferingCards from '../components/deity/DeityOfferingCards.vue'
 import { getInitialData } from '../services/dataSource'
@@ -16,21 +16,6 @@ import { syncTierShopItems, tierPricesFromShopItems, validateTierPrices } from '
 const deities = ref([])
 const mockDeities = getInitialData('deityOfferings')
 const descriptionsByName = new Map(mockDeities.map(({ name, description }) => [name, description]))
-const knownDeities = [
-  ['doumu', '斗姆元君'],
-  ['beidou', '北斗九皇'],
-  ['taisui', '六十甲子太岁'],
-  ['sanguan', '三官大帝'],
-  ['wenchang', '文昌帝君'],
-  ['kuixing', '魁星帝君'],
-  ['zhaogongming', '玄坛赵元帅'],
-  ['wanglingguan', '王灵官'],
-  ['guansheng', '关圣帝君'],
-  ['dongyue', '东岳大帝'],
-  ['leizun', '九天应元雷声普化天尊'],
-  ['fanli', '文财神范蠡'],
-  ['tudigong', '福德正神'],
-].map(([id, name]) => ({ id, name, description: descriptionsByName.get(name) || '' }))
 const loading = ref(false)
 const saving = ref(false)
 const formLoading = ref(false)
@@ -73,10 +58,6 @@ const form = reactive({
 
 // 当前神像已关联的商品 id，编辑时优先改这些商品的价格而不是新建。
 const existingShopItemIds = ref([])
-
-const availableDeities = computed(() => knownDeities.filter((option) => (
-  !deities.value.some((deity) => deity.name === option.name && deity.id !== currentDeity.value?.id)
-)))
 
 function getList(payload) {
   if (Array.isArray(payload)) return payload
@@ -133,7 +114,6 @@ function openCreate() {
   mode.value = 'create'
   currentDeity.value = null
   resetForm()
-  form.matchGod = availableDeities.value[0]?.name || ''
   editVisible.value = true
 }
 
@@ -211,8 +191,22 @@ async function loadDeities() {
 
 async function submitDeity() {
   if (saving.value) return
-  if (!form.matchGod) {
-    ElMessage.warning('请选择官网中已有的神像')
+  // 除「分类」外其余字段均必填；标签为一组，至少填写一个；四档金额由 validateTierPrices 校验。
+  const requiredFields = [
+    { key: 'image', label: '神像图' },
+    { key: 'matchGod', label: '神像名称' },
+    { key: 'desc', label: '神像描述' },
+    { key: 'christmas', label: '圣诞' },
+    { key: 'source', label: '来历' },
+    { key: 'merit', label: '所求功德' },
+  ]
+  const missing = requiredFields.find(({ key }) => !String(form[key] ?? '').trim())
+  if (missing) {
+    ElMessage.warning(`请填写${missing.label}`)
+    return
+  }
+  if (!tagFields.some((key) => String(form[key] ?? '').trim())) {
+    ElMessage.warning('请至少填写一个标签')
     return
   }
   const tierError = validateTierPrices(tierFields.map((key) => form[key]))
@@ -225,8 +219,9 @@ async function submitDeity() {
   const isEdit = mode.value === 'edit'
   const deityId = currentDeity.value?.id
   const imageFile = selectedImageFile.value
+  const matchGod = form.matchGod.trim()
   const payload = {
-    matchGod: form.matchGod,
+    matchGod,
     desc: form.desc.trim(),
     // 分类未选择时不提交，避免把已有值覆盖成 0。
     category: form.category === '' ? undefined : Number(form.category),
@@ -248,7 +243,7 @@ async function submitDeity() {
     const shopItemsIds = await syncTierShopItems({
       existingIds: existingShopItemIds.value,
       prices: tierFields.map((key) => form[key]),
-      namePrefix: `${form.matchGod}·`,
+      namePrefix: `${matchGod}·`,
       useType: '神像供奉',
       picture: finalPicture,
     })
@@ -311,7 +306,7 @@ onMounted(loadDeities)
     <section class="deity-panel">
       <div class="panel-toolbar">
         <span>共 {{ deities.length }} 尊神像</span>
-        <el-button type="primary" :disabled="!availableDeities.length" @click="openCreate">新增供奉配置</el-button>
+        <el-button type="primary" @click="openCreate">新增供奉配置</el-button>
       </div>
 
       <el-skeleton v-if="loading" :rows="4" animated />
@@ -329,7 +324,7 @@ onMounted(loadDeities)
       @closed="clearLocalPreview"
     >
       <el-form v-loading="formLoading" class="deity-form" label-position="top" @submit.prevent>
-        <el-form-item label="神像图">
+        <el-form-item label="神像图" required>
           <label class="upload-box">
             <input type="file" accept="image/*" @change="onImageChange" />
             <img v-if="form.image" :src="form.image" class="upload-preview" alt="神像图预览" />
@@ -342,13 +337,11 @@ onMounted(loadDeities)
         </el-form-item>
 
         <el-form-item label="神像名称" required>
-          <el-select v-model="form.matchGod" filterable placeholder="请选择神像">
-            <el-option v-for="option in availableDeities" :key="option.id" :label="option.name" :value="option.name" />
-          </el-select>
+          <el-input v-model="form.matchGod" placeholder="请输入神像名称" maxlength="30" />
           <p class="form-tip">名称需与官网神像一致，避免供奉信息展示到错误神像。</p>
         </el-form-item>
 
-        <el-form-item label="神像描述">
+        <el-form-item label="神像描述" required>
           <el-input v-model="form.desc" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="请输入神像描述" />
         </el-form-item>
 
@@ -358,23 +351,23 @@ onMounted(loadDeities)
           </el-select>
         </el-form-item>
 
-        <el-form-item label="圣诞">
+        <el-form-item label="圣诞" required>
           <el-input v-model="form.christmas" maxlength="30" placeholder="神像生辰，例如：农历九月初一" />
         </el-form-item>
 
-        <el-form-item label="来历">
+        <el-form-item label="来历" required>
           <el-input v-model="form.source" type="textarea" :rows="2" maxlength="200" show-word-limit placeholder="请输入神像来历" />
         </el-form-item>
 
-        <el-form-item label="所求功德">
+        <el-form-item label="所求功德" required>
           <el-input v-model="form.merit" type="textarea" :rows="2" maxlength="200" show-word-limit placeholder="请输入所求功德" />
         </el-form-item>
 
-        <el-form-item label="标签">
+        <el-form-item label="标签" required>
           <div class="tag-grid">
             <el-input v-for="key in tagFields" :key="key" v-model="form[key]" maxlength="2" placeholder="两个字" />
           </div>
-          <p class="form-tip">最多三个标签，每个限 2 个字。</p>
+          <p class="form-tip">最多三个标签，每个限 2 个字，至少填写一个。</p>
         </el-form-item>
 
         <el-form-item label="供奉金额($)(4档)" required>

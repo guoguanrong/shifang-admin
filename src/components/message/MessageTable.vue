@@ -18,10 +18,10 @@ const statusText = {
   hidden: '隐藏中',
 }
 
-// 分类标签配色：知名人士 金 / 道内人士 蓝 / 其他重要人士 灰。
+// 分类标签配色：知名人士 金 / 业内人士 蓝 / 其他善信人士 灰（兼容历史旧值）。
 function categoryClass(category) {
   if (category === '知名人士') return 'cat-known'
-  if (category === '道内人士') return 'cat-taoist'
+  if (category === '业内人士' || category === '道内人士') return 'cat-taoist'
   return 'cat-other'
 }
 

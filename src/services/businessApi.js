@@ -20,7 +20,33 @@ export function deleteWorshipById(id) {
   return http.post(`/worship/delete/${id}`)
 }
 
+// 上传前置校验：仅接收常见图片/视频格式，大小超限或未支持的类型直接给出可读提示，
+// 避免大文件一直停在「上传中」或接口报错后没有任何说明。
+const IMAGE_TYPES = /^image\/(jpeg|png|webp|gif)$/i
+const VIDEO_TYPES = /^video\/(mp4|webm|quicktime|x-m4v)$/i
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v)$/i
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024
+
+function validateUploadFile(file) {
+  if (!file) throw new Error('请选择要上传的文件')
+
+  const isImage = IMAGE_TYPES.test(file.type || '') || IMAGE_EXT.test(file.name || '')
+  const isVideo = VIDEO_TYPES.test(file.type || '') || VIDEO_EXT.test(file.name || '')
+  if (!isImage && !isVideo) {
+    throw new Error('仅支持 JPG/PNG/WEBP/GIF 图片或 MP4/WEBM/MOV 视频')
+  }
+  if (isImage && file.size > MAX_IMAGE_SIZE) {
+    throw new Error('图片不能超过 10MB，请压缩后再上传')
+  }
+  if (isVideo && file.size > MAX_VIDEO_SIZE) {
+    throw new Error('视频不能超过 100MB，请压缩后再上传')
+  }
+}
+
 export function uploadBusinessFile(file) {
+  validateUploadFile(file)
   const formData = new FormData()
   formData.append('file', file)
   return http.post('/sys/file/upload', formData, { timeout: 180000 })
@@ -188,6 +214,12 @@ export function deleteLightById(id) {
 
 export function getShopItemsList(params) {
   return http.post('/shopItems/list', params)
+}
+
+// /donateTarget/get/{id} 的 shopItems / shopItemsList 可能为 null，
+// 关联的四档商品/捐赠物品需按目标 id 与类型单独查询。
+export function getDonateShopItems(data) {
+  return http.post('/shopItems/getDonateShopItems', data)
 }
 
 export function getShopItemsById(id) {

@@ -6,6 +6,7 @@ import UserFilterBar from '../components/user/UserFilterBar.vue'
 import UserTable from '../components/user/UserTable.vue'
 import { createUserListFilters } from '../constants/listFilters'
 import { getMemberList, updateMember } from '../services/businessApi'
+import { exportMembers } from '../services/exportApi'
 import { downloadCsv } from '../utils/csv'
 import { mapMemberToRow, memberStatusValue } from '../utils/memberDisplay'
 
@@ -18,6 +19,7 @@ const filters = ref(createUserListFilters())
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 
 // 次数类筛选：空值不参与查询，非数字输入直接忽略。
 function numberFilter(value) {
@@ -32,13 +34,10 @@ function goDetail(user) {
   router.push(`/users/${user.id}`)
 }
 
-// 拉取会员列表：手机号、邮箱、城市、状态、注册时间区间、捐款/点灯/供奉次数均由服务端筛选。
-async function loadUsers() {
-  loading.value = true
+// /member/list 与 /member/export 共用 MemberDTO 筛选条件；列表加分页，导出不带分页。
+function buildQuery() {
   const { phone, email, status, startDate, endDate, donateCount, lightCount, worshipCount, city } = filters.value
-  const params = {
-    page: currentPage.value,
-    pageSize: PAGE_SIZE,
+  return {
     phone: phone.trim() || undefined,
     email: email.trim() || undefined,
     city: city.trim() || undefined,
@@ -49,9 +48,18 @@ async function loadUsers() {
     startTime: startDate ? `${startDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined,
   }
+}
 
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
+}
+
+// 拉取会员列表：手机号、邮箱、城市、状态、注册时间区间、捐款/点灯/供奉次数均由服务端筛选。
+async function loadUsers() {
+  loading.value = true
   try {
-    const payload = await getMemberList(params)
+    const payload = await getMemberList(buildParams())
     const result = payload?.data ?? payload
     const list = Array.isArray(result) ? result : result?.list
     users.value = Array.isArray(list) ? list.map(mapMemberToRow) : []
@@ -135,20 +143,38 @@ async function batchFreeze() {
   await loadUsers()
 }
 
-// 导出 CSV：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
-function exportUsers() {
-  const exportRows = selection.value.length ? selection.value : users.value
+// 勾选行走前端 CSV：/member/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedUsers() {
   const headers = [
     '邮箱', '善信名称', '用户ID', '注册时间', '捐款金额', '捐款次数',
     '共建十方次数', '点灯次数', '神像供奉次数', '点灯金额', '供奉金额', '来源渠道', '状态',
   ]
-  const lines = exportRows.map((user) => [
+  const lines = selection.value.map((user) => [
     user.email, user.nickname, user.id, user.registeredAt, user.donateAmount,
     user.donateCount ?? '—', user.coBuildCount ?? '—',
     user.lightCount ?? '—', user.worshipCount ?? '—', user.lightAmount, user.worshipAmount,
     user.source, user.status === 'normal' ? '正常' : '冻结中',
   ])
   downloadCsv('十方殿用户列表.csv', headers, lines)
+}
+
+// 未勾选时调用 /member/export，按当前筛选条件导出全量数据。
+async function exportUsers() {
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedUsers()
+    return
+  }
+
+  exporting.value = true
+  try {
+    await exportMembers(buildQuery(), '十方殿用户列表')
+    ElMessage.success('用户列表已导出')
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出用户列表失败')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -164,7 +190,7 @@ function exportUsers() {
     <section class="table-card">
       <div class="table-toolbar">
         <span><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button :disabled="loading" @click="exportUsers">导出</el-button>
+        <el-button :loading="exporting" :disabled="loading" @click="exportUsers">导出</el-button>
         <el-button class="batch-button" :disabled="loading" @click="batchFreeze">批量冻结</el-button>
       </div>
 

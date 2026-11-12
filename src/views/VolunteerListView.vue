@@ -5,6 +5,7 @@ import { RefreshRight, CircleClose } from '@element-plus/icons-vue'
 import VolunteerFilterBar from '../components/volunteer/VolunteerFilterBar.vue'
 import VolunteerTable from '../components/volunteer/VolunteerTable.vue'
 import { getVolunteerList, saveVolunteer, updateVolunteer } from '../services/businessApi'
+import { exportVolunteers } from '../services/exportApi'
 import { downloadCsv } from '../utils/csv'
 
 const PAGE_SIZE = 10
@@ -23,6 +24,7 @@ const selection = ref([])
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 const saving = ref(false)
 const togglingId = ref(null)
 
@@ -43,22 +45,28 @@ function mapVolunteer(item) {
   }
 }
 
-// 拉取义工名单：正常 + 禁止参加；姓名走 searchKey，手机号右模糊，岗位精确匹配。
-// 接口 status 暂不支持多值：选中状态时走服务端单值查询，「全部」时拉全量后前端过滤（分页计数以接口为准）。
-async function loadVolunteers() {
-  loading.value = true
+// /volunteer/list 与 /volunteer/export 使用同一份 VolunteerDTO：姓名走 searchKey，手机号右模糊，岗位精确匹配。
+// 未选状态时接口按全状态导出，页面的 2/4 状态过滤只用于列表展示。
+function buildQuery() {
   const { name, phone, post, status } = filters.value
-  const params = {
-    page: currentPage.value,
-    pageSize: PAGE_SIZE,
+  return {
     status: status ? statusValue[status] : undefined,
     searchKey: (name || '').trim() || undefined,
     phone: (phone || '').trim() || undefined,
     applyPost: post || undefined,
   }
+}
 
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
+}
+
+// 拉取义工名单：正常 + 禁止参加；接口 status 暂不支持多值，「全部」时拉全量后前端过滤。
+async function loadVolunteers() {
+  loading.value = true
   try {
-    const payload = await getVolunteerList(params)
+    const payload = await getVolunteerList(buildParams())
     const result = payload?.data ?? payload
     const list = Array.isArray(result) ? result : result?.list
     let rows = Array.isArray(list) ? list.map(mapVolunteer) : []
@@ -201,11 +209,10 @@ async function toggleBan(volunteer) {
   }
 }
 
-// 导出名单：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
-function exportVolunteers() {
-  const exportRows = selection.value.length ? selection.value : volunteers.value
+// 勾选行走前端 CSV：/volunteer/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedVolunteers() {
   const headers = ['善信姓名', '联络手机', '申请岗位', '可服务时间', '加入类型', '加入时间', '状态', '禁止原因', '申请留言']
-  const lines = exportRows.map((item) => [
+  const lines = selection.value.map((item) => [
     item.name,
     item.phone,
     item.post,
@@ -217,6 +224,25 @@ function exportVolunteers() {
     item.declaration || '—',
   ])
   downloadCsv('义工名单.csv', headers, lines)
+}
+
+// 未勾选时调用 /volunteer/export，按当前筛选条件导出全量数据。
+async function exportVolunteersList() {
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedVolunteers()
+    return
+  }
+
+  exporting.value = true
+  try {
+    await exportVolunteers(buildQuery(), '义工名单')
+    ElMessage.success('义工名单已导出')
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出义工名单失败')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -233,7 +259,7 @@ function exportVolunteers() {
       <div class="table-toolbar">
         <span><b>✓</b> 已选 {{ selection.length }} 项</span>
         <el-button class="add-button" :disabled="loading" @click="openAdd">+ 新增义工</el-button>
-        <el-button class="export-button" :disabled="loading" @click="exportVolunteers">导出名单</el-button>
+        <el-button class="export-button" :loading="exporting" :disabled="loading" @click="exportVolunteersList">导出名单</el-button>
       </div>
 
       <VolunteerTable

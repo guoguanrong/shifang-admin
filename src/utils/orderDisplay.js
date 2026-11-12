@@ -67,8 +67,16 @@ export function mapDonationOrder(order, shopItemNames = {}) {
   }
 }
 
+// OrderVo.fileUrl 既可能是图片也可能是视频，预览弹窗需按扩展名区分渲染。
+const VIDEO_URL_RE = /\.(mp4|webm|mov|m4v)(\?|$)/i
+export function isVideoFileUrl(url) {
+  return VIDEO_URL_RE.test(String(url || ''))
+}
+
 // OrderVo → 表格行。
 export function mapOrder(order) {
+  const fileUrl = order.fileUrl || ''
+  const isVideo = isVideoFileUrl(fileUrl)
   return {
     id: order.id,
     orderNo: order.orderNo || '—',
@@ -84,7 +92,8 @@ export function mapOrder(order) {
     status: orderStatusKey[Number(order.status)] || 'unpaid',
     orderedAt: order.createTime || '—',
     expireAt: order.expirationTime || '—',
-    previewImage: order.fileUrl || '',
+    previewImage: isVideo ? '' : fileUrl,
+    previewVideo: isVideo ? fileUrl : '',
     lamp: order.light?.name || '—',
     project: order.worship?.matchGod || '—',
   }

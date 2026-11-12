@@ -5,6 +5,7 @@ import DonationFilterBar from '../components/donation/DonationFilterBar.vue'
 import DonationTable from '../components/donation/DonationTable.vue'
 import { createDonationRecordFilters } from '../constants/listFilters'
 import { getOrderList, getShopItemsList } from '../services/businessApi'
+import { exportOrders as exportOrderList } from '../services/exportApi'
 import { downloadCsv } from '../utils/csv'
 import { donateTypeText, mapDonationOrder, orderTypeValue } from '../utils/orderDisplay'
 
@@ -18,6 +19,7 @@ const selection = ref([])
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 
 function getList(payload) {
   const result = payload?.data ?? payload
@@ -36,21 +38,28 @@ const totalAmount = computed(() => (
   filteredRecords.value.reduce((sum, item) => sum + Number(item.amount || 0), 0)
 ))
 
-// 拉取捐赠订单：固定 type=3，联络手机为接口精确查询。
-async function loadRecords() {
-  loading.value = true
+// /order/list 与 /order/export 使用同一份 OrderDTO：固定 type=3，联络手机精确查询。
+// donateType 不是接口查询参数，只在页内筛选。
+function buildQuery() {
   const { phone, startDate, endDate } = filters.value
-  const params = {
-    page: currentPage.value,
-    pageSize: PAGE_SIZE,
+  return {
     type: orderTypeValue.donation,
     mobile: (phone || '').trim() || undefined,
     startTime: startDate ? `${startDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined,
   }
+}
 
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
+}
+
+// 拉取捐赠订单：固定 type=3，联络手机为接口精确查询。
+async function loadRecords() {
+  loading.value = true
   try {
-    const payload = await getOrderList(params)
+    const payload = await getOrderList(buildParams())
     const result = payload?.data ?? payload
     records.value = getList(payload).map((item) => mapDonationOrder(item, shopItemNames.value))
     const responseTotal = Number(result?.totalRow)
@@ -107,11 +116,10 @@ onMounted(async () => {
   await loadRecords()
 })
 
-// 导出明细 CSV：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
-function exportRecords() {
-  const exportRows = selection.value.length ? selection.value : filteredRecords.value
+// 勾选行走前端 CSV：/order/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedRecords() {
   const headers = ['捐赠单号', '用户', '善信姓名', '联络手机', '邮箱', '捐赠目标', '捐赠类型', '捐赠物品', '金额', '支付渠道', '祈福留言', '捐赠时间']
-  const lines = exportRows.map((item) => [
+  const lines = selection.value.map((item) => [
     item.orderNo,
     `${item.nickname}（${item.userPhone}）`,
     item.name,
@@ -126,6 +134,25 @@ function exportRecords() {
     item.donatedAt,
   ])
   downloadCsv('捐赠记录明细.csv', headers, lines)
+}
+
+// 未勾选时调用 /order/export（type=3），按当前筛选条件导出全量捐赠订单。
+async function exportRecords() {
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedRecords()
+    return
+  }
+
+  exporting.value = true
+  try {
+    await exportOrderList(buildQuery(), '捐赠记录明细')
+    ElMessage.success('捐赠记录已导出')
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出捐赠记录失败')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -142,7 +169,7 @@ function exportRecords() {
       <div class="table-toolbar">
         <span>本页累计 <b>${{ totalAmount.toLocaleString('en-US') }}</b></span>
         <span class="selection-info"><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button class="export-button" :disabled="loading" @click="exportRecords">导出明细</el-button>
+        <el-button class="export-button" :loading="exporting" :disabled="loading" @click="exportRecords">导出明细</el-button>
       </div>
 
       <DonationTable

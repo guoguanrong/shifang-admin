@@ -45,7 +45,6 @@ const emit = defineEmits(['selection-change', 'preview', 'page-change'])
         </template>
       </el-table-column>
       <el-table-column prop="orderedAt" label="下单时间" min-width="165" />
-      <el-table-column prop="expireAt" label="供奉到期时间" min-width="165" />
       <el-table-column label="操作" width="135" fixed="right">
         <template #default="{ row }">
           <ActionLink :icon="View" text="查看供奉图片" @click="emit('preview', row)" />

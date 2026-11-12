@@ -19,7 +19,9 @@ export function validateTierPrices(prices) {
 export function tierPricesFromShopItems(shopItemsList, count = 4) {
   const items = [...(shopItemsList || [])].sort((a, b) => Number(a.seq ?? 0) - Number(b.seq ?? 0))
   return Array.from({ length: count }, (_, index) => {
-    const price = Number(items[index]?.price)
+    const raw = items[index]?.price
+    if (raw === '' || raw === null || raw === undefined) return ''
+    const price = Number(raw)
     return Number.isFinite(price) ? String(price) : ''
   })
 }
@@ -49,8 +51,14 @@ export async function syncTierShopItems({ existingIds = [], prices, namePrefix, 
     }
 
     const created = await saveShopItems(body)
-    const createdId = Number(created?.id ?? created)
-    if (Number.isFinite(createdId) && createdId > 0) ids.push(createdId)
+    const rawId = created?.id ?? created?.data?.id ?? created
+    // 部分后端 save 只返回 true，Number(true) 会被误当成 id=1。
+    const createdId = typeof rawId === 'boolean' ? NaN : Number(rawId)
+    // 拿不到 id 时不能静默跳过：否则目标少关联一档，编辑时四档永远回填不全。
+    if (!Number.isFinite(createdId) || createdId <= 0) {
+      throw new Error(`第 ${tier} 档商品创建失败：接口未返回商品 ID`)
+    }
+    ids.push(createdId)
   }
 
   return ids

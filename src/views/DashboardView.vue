@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Avatar, Calendar, Coin, Goods, Refresh, Ticket, User, Wallet } from '@element-plus/icons-vue'
@@ -91,10 +91,11 @@ async function loadMetrics() {
 const GOAL_STATUS_TEXT = { 1: '进行中', 2: '已完成', 3: '已停止' }
 const donationGoals = ref([])
 
-// 统一取数组：兼容数组与 {list} 包装两种返回。
+// 统一取数组：兼容数组、{list} 与 {data:[...]} 包装。
 function asList(payload) {
-  if (Array.isArray(payload)) return payload
-  return Array.isArray(payload?.list) ? payload.list : []
+  const result = payload?.data ?? payload
+  if (Array.isArray(result)) return result
+  return Array.isArray(result?.list) ? result.list : []
 }
 
 async function loadGoalProgress() {
@@ -114,9 +115,15 @@ async function loadGoalProgress() {
 }
 
 // ── 待办事项 ──
-// key 是后端标识，文案与跳转路径由前端映射；未识别的 key 兜底展示原值且不可跳转。
-const TODO_META = {
-  volunteer: { label: '待审核义工申请', path: '/volunteers/applications' },
+// 接口 TodoVo 只返回 {key, count}，文案、图标与跳转路径由前端按 key 语义映射，
+// 未识别的 key 也用中文占位，避免把 volunteer_audit 这类英文标识直接展示给用户。
+function todoMeta(key) {
+  const text = String(key ?? '').toLowerCase()
+  if (text.includes('volunteer')) return { label: '待审核义工申请', icon: '审', path: '/volunteers/applications' }
+  if (text.includes('activity') || text.includes('register')) return { label: '待处理道会报名', icon: '会', path: '/activities/registrations' }
+  if (text.includes('order')) return { label: '待处理订单', icon: '单', path: '/orders/lamps' }
+  if (text.includes('donat')) return { label: '待处理捐赠', icon: '捐', path: '/donations/records' }
+  return { label: '待处理事项', icon: '办', path: '' }
 }
 const todos = ref([])
 
@@ -126,7 +133,7 @@ async function loadTodos() {
     todos.value = rows.map((row) => ({
       key: row.key,
       count: Number(row.count) || 0,
-      ...(TODO_META[row.key] || { label: row.key, path: '' }),
+      ...todoMeta(row.key),
     }))
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '获取待办事项失败')
@@ -257,6 +264,33 @@ async function refreshDashboard() {
   ElMessage.success('看板数据已刷新')
 }
 
+// 快捷/自定义时间范围变化后立即重新请求对应图表；
+// 「自定义」日期未选完整时先不请求，避免用「本月」参数覆盖已有数据。
+watch(
+  [() => amountRange.range, () => amountRange.dateRange],
+  () => {
+    if (amountRange.range !== 'custom' || amountRange.dateRange?.length === 2) loadTransactionAmount()
+  },
+  { deep: true },
+)
+watch(
+  [() => orderRange.range, () => orderRange.dateRange],
+  () => {
+    if (orderRange.range !== 'custom' || orderRange.dateRange?.length === 2) loadTransactionOrder()
+  },
+  { deep: true },
+)
+watch(
+  donutRanges,
+  () => {
+    donutDefs.forEach((def) => {
+      const range = donutRanges[def.key]
+      if (range.range !== 'custom' || range.dateRange?.length === 2) loadDonut(def)
+    })
+  },
+  { deep: true },
+)
+
 onMounted(refreshDashboard)
 </script>
 
@@ -313,7 +347,7 @@ onMounted(refreshDashboard)
             class="todo-row"
             @click="goTodo(todo)"
           >
-            <span class="todo-icon">审</span>
+            <span class="todo-icon">{{ todo.icon }}</span>
             <span class="todo-name">{{ todo.label }}</span>
             <span v-if="todo.path" class="todo-action">前往处理 →</span>
             <b>{{ todo.count }} 条</b>

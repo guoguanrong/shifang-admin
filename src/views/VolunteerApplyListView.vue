@@ -5,6 +5,7 @@ import ApplyFilterBar from '../components/volunteer/ApplyFilterBar.vue'
 import ApplyTable from '../components/volunteer/ApplyTable.vue'
 import { createVolunteerApplicationFilters } from '../constants/listFilters'
 import { getVolunteerList, updateVolunteer } from '../services/businessApi'
+import { exportVolunteers } from '../services/exportApi'
 import { downloadCsv } from '../utils/csv'
 
 const PAGE_SIZE = 10
@@ -25,6 +26,7 @@ const currentPage = ref(1)
 const total = ref(0)
 const pendingCount = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 const reviewing = ref(false)
 
 // VolunteerVo → 表格行：申请留言取 remark，可服务时间取 serviceTime，拒绝/禁止原因分别取 refuseReason / banReason。
@@ -43,22 +45,28 @@ function mapApplication(item) {
   }
 }
 
-// 拉取申请列表：手机号右模糊、状态、申请岗位（精确）、申请时间区间均由服务端筛选。
-async function loadApplications() {
-  loading.value = true
+// /volunteer/list 与 /volunteer/export 共用 VolunteerDTO 筛选条件；列表加分页，导出不带分页。
+function buildQuery() {
   const { phone, status, post, startDate, endDate } = filters.value
-  const params = {
-    page: currentPage.value,
-    pageSize: PAGE_SIZE,
+  return {
     phone: phone.trim() || undefined,
     status: status ? statusValue[status] : undefined,
     applyPost: post || undefined,
     startTime: startDate ? `${startDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined,
   }
+}
 
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
+}
+
+// 拉取申请列表：手机号右模糊、状态、申请岗位（精确）、申请时间区间均由服务端筛选。
+async function loadApplications() {
+  loading.value = true
   try {
-    const payload = await getVolunteerList(params)
+    const payload = await getVolunteerList(buildParams())
     const result = payload?.data ?? payload
     const list = Array.isArray(result) ? result : result?.list
     // 排除「禁止参加」(status=4)：属于义工列表的范畴，避免兜底成待审核出现审核入口。
@@ -178,11 +186,10 @@ async function rejectApplication() {
   }
 }
 
-// 导出 CSV：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
-function exportApplications() {
-  const exportRows = selection.value.length ? selection.value : applications.value
+// 勾选行走前端 CSV：/volunteer/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedApplications() {
   const headers = ['申请ID', '善信姓名', '联络手机', '申请岗位', '可服务时间', '申请时间', '申请留言', '状态', '拒绝原因']
-  const lines = exportRows.map((item) => [
+  const lines = selection.value.map((item) => [
     item.id,
     item.name,
     item.phone,
@@ -194,6 +201,25 @@ function exportApplications() {
     item.rejectReason || '—',
   ])
   downloadCsv('义工申请列表.csv', headers, lines)
+}
+
+// 未勾选时调用 /volunteer/export，按当前筛选条件导出全量义工申请。
+async function exportApplications() {
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedApplications()
+    return
+  }
+
+  exporting.value = true
+  try {
+    await exportVolunteers(buildQuery(), '义工申请列表')
+    ElMessage.success('义工申请列表已导出')
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出义工申请列表失败')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -210,7 +236,7 @@ function exportApplications() {
       <div class="table-toolbar">
         <span>共 <b>{{ pendingCount }}</b> 条待审核</span>
         <span class="selection-info"><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button class="export-button" :disabled="loading" @click="exportApplications">导出</el-button>
+        <el-button class="export-button" :loading="exporting" :disabled="loading" @click="exportApplications">导出</el-button>
       </div>
 
       <ApplyTable

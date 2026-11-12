@@ -1,19 +1,22 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import RolePermissionTree from './RolePermissionTree.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   // role: SysRoleVo 映射行 { id, name, key, menuIdList }
   role: { type: Object, default: null },
-  // menus: 后端菜单树（SysMenuVo，label 取 title），按钮节点为 type=3 的叶子
+  // menus: POST /menu/list 的 SysMenuVo 树（type 1.目录 2.菜单 3.按钮）
   menus: { type: Array, required: true },
 })
 const emit = defineEmits(['update:modelValue', 'save'])
 const formRef = ref(null)
-const treeRef = ref(null)
 const form = reactive({ name: '', key: '' })
+// 提交给 POST /role/setMenu 的 RoleMenuDTO.menuIdList，含目录/菜单/按钮各层节点 id。
+const menuIdList = ref([])
 
+// /role/save 与 /role/update 的 required 都是 name + key，权限字符是接口必填项。
 const rules = {
   name: [
     { required: true, whitespace: true, message: '请输入角色名称', trigger: 'blur' },
@@ -25,40 +28,26 @@ const rules = {
   ],
 }
 
-const treeProps = { label: 'title', children: 'children' }
-
-// 回显只勾叶子节点：父节点交给 el-tree 父子联动推导，
-// 否则 default-checked-keys 里的父节点会强制全选其子级。
-const checkedKeysOnOpen = computed(() => {
-  const leafIds = new Set()
-  const walk = (nodes) => {
-    nodes.forEach((node) => {
-      if (node.children?.length) walk(node.children)
-      else leafIds.add(node.id)
-    })
-  }
-  walk(props.menus)
-  return (props.role?.menuIdList || []).filter((id) => leafIds.has(id))
-})
-
 watch(() => props.modelValue, (visible) => {
   if (!visible) return
   form.name = props.role?.name || ''
-  form.key = props.role?.key || ''
+  form.key = props.role?.key && props.role.key !== '—' ? props.role.key : ''
+  menuIdList.value = [...(props.role?.menuIdList || [])]
   formRef.value?.clearValidate()
 })
 
 function submit() {
   formRef.value.validate(async (valid) => {
     if (!valid) return
-    const checked = treeRef.value?.getCheckedKeys() || []
-    const halfChecked = treeRef.value?.getHalfCheckedKeys() || []
-    const menuIdList = [...checked, ...halfChecked]
-    if (!checked.length) {
-      ElMessage.warning('请至少选择一项权限')
+    if (!menuIdList.value.length) {
+      ElMessage.warning('请至少勾选一项权限')
       return
     }
-    emit('save', { name: form.name.trim(), key: form.key.trim(), menuIdList })
+    emit('save', {
+      name: form.name.trim(),
+      key: form.key.trim(),
+      menuIdList: [...menuIdList.value],
+    })
     emit('update:modelValue', false)
   })
 }
@@ -67,8 +56,8 @@ function submit() {
 <template>
   <el-dialog
     :model-value="modelValue"
-    :title="role ? '编辑角色' : '新增角色'"
-    width="560px"
+    title="新增/编辑"
+    width="660px"
     class="role-dialog"
     destroy-on-close
     append-to-body
@@ -79,18 +68,10 @@ function submit() {
         <el-input v-model="form.name" maxlength="30" placeholder="请输入角色名称" />
       </el-form-item>
       <el-form-item label="权限字符" prop="key">
-        <el-input v-model="form.key" maxlength="50" placeholder="如 admin、operator，用于前端权限标识" />
+        <el-input v-model="form.key" maxlength="50" placeholder="如 admin、operator，接口必填" />
       </el-form-item>
       <el-form-item label="权限配置" class="permission-field">
-        <el-tree
-          ref="treeRef"
-          :data="menus"
-          node-key="id"
-          :props="treeProps"
-          show-checkbox
-          default-expand-all
-          :default-checked-keys="checkedKeysOnOpen"
-        />
+        <RolePermissionTree v-model="menuIdList" :menus="menus" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -102,7 +83,7 @@ function submit() {
 
 <style lang="less">
 .role-dialog {
-  width: min(640px, calc(100vw - 28px)) !important;
+  width: min(720px, calc(100vw - 28px)) !important;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -126,15 +107,7 @@ function submit() {
   .el-form-item__label { padding-bottom: 8px; color: var(--admin-text-regular); font-size: 13px; font-weight: 600; }
   .el-input__wrapper { min-height: 40px; border-radius: 8px; }
   .permission-field .el-form-item__content { display: block; }
-  .permission-field .el-tree {
-    width: 100%;
-    max-height: 320px;
-    padding: 8px 4px;
-    overflow-y: auto;
-    background: var(--admin-surface-muted);
-    border: 1px solid var(--admin-border-light);
-    border-radius: 8px;
-  }
+  .permission-field .perm-box { width: 100%; max-height: 360px; }
 
   @media (max-width: 580px) {
     .el-dialog__header { padding: 20px 22px; }

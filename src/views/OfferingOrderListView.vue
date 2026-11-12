@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import OfferingOrderFilterBar from '../components/order/OfferingOrderFilterBar.vue'
 import OfferingOrderTable from '../components/order/OfferingOrderTable.vue'
 import { getOrderList } from '../services/businessApi'
+import { exportOrders as exportOrderList } from '../services/exportApi'
 import { downloadCsv } from '../utils/csv'
 import { mapOrder, orderStatusText, orderStatusValue, orderTypeValue } from '../utils/orderDisplay'
 
@@ -15,6 +16,7 @@ const selection = ref([])
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 
 function getList(payload) {
   const result = payload?.data ?? payload
@@ -22,13 +24,10 @@ function getList(payload) {
   return result?.list || result?.records || []
 }
 
-// 拉取供奉订单：固定 type=2，订单号/手机号为接口精确查询。
-async function loadOrders() {
-  loading.value = true
+// /order/list 与 /order/export 使用同一份 OrderDTO：固定 type=2，订单号/手机号为接口精确查询。
+function buildQuery() {
   const { orderId, userPhone, status, startDate, endDate } = filters.value
-  const params = {
-    page: currentPage.value,
-    pageSize: PAGE_SIZE,
+  return {
     type: orderTypeValue.offering,
     orderNo: (orderId || '').trim() || undefined,
     mobile: (userPhone || '').trim() || undefined,
@@ -36,9 +35,17 @@ async function loadOrders() {
     startTime: startDate ? `${startDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined,
   }
+}
 
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
+}
+
+async function loadOrders() {
+  loading.value = true
   try {
-    const payload = await getOrderList(params)
+    const payload = await getOrderList(buildParams())
     const result = payload?.data ?? payload
     orders.value = getList(payload).map(mapOrder)
     const responseTotal = Number(result?.totalRow)
@@ -83,11 +90,10 @@ function openPreview(order) {
   viewVisible.value = true
 }
 
-// 导出订单 CSV：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
-function exportOrders() {
-  const exportRows = selection.value.length ? selection.value : orders.value
-  const headers = ['订单号', '用户', '善信手机号', '供奉项目', '善信姓名', '祈福心愿', '金额', '状态', '下单时间', '供奉到期时间']
-  const lines = exportRows.map((item) => [
+// 勾选行走前端 CSV：/order/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedOrders() {
+  const headers = ['订单号', '用户', '善信手机号', '供奉项目', '善信姓名', '祈福心愿', '金额', '状态', '下单时间']
+  const lines = selection.value.map((item) => [
     item.orderNo,
     item.nickname,
     item.userPhone,
@@ -97,9 +103,27 @@ function exportOrders() {
     `$${item.amount}`,
     orderStatusText[item.status],
     item.orderedAt,
-    item.expireAt,
   ])
   downloadCsv('供奉订单.csv', headers, lines)
+}
+
+// 未勾选时调用 /order/export（type=2），按当前筛选条件导出全量供奉订单。
+async function exportOrders() {
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedOrders()
+    return
+  }
+
+  exporting.value = true
+  try {
+    await exportOrderList(buildQuery(), '供奉订单')
+    ElMessage.success('供奉订单已导出')
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出供奉订单失败')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -115,7 +139,7 @@ function exportOrders() {
     <section class="table-card">
       <div class="table-toolbar">
         <span><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button class="export-button" :disabled="loading" @click="exportOrders">导出订单</el-button>
+        <el-button class="export-button" :loading="exporting" :disabled="loading" @click="exportOrders">导出订单</el-button>
       </div>
 
       <OfferingOrderTable

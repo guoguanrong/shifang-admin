@@ -22,7 +22,8 @@ export const activityStatusKey = { 1: 'pending', 2: 'enrolling', 3: 'registratio
 // 上架状态：1.上架 2.暂不上架。
 export const activityListedValue = { on: 1, off: 2 }
 
-const ONLINE_OFFLINE_TEXT = '线上登记 / 线下亲临'
+// 接口 joinType 只有 1/2 单选，历史数据未下发参加方式时统一回退到「线上登记」。
+const ONLINE_OFFLINE_TEXT = '线上登记'
 
 function splitByComma(text) {
   return String(text ?? '').split(/[,，]/).map((item) => item.trim()).filter(Boolean)
@@ -52,10 +53,6 @@ function parseJsonArray(value) {
   } catch {
     return []
   }
-}
-
-function stringifyJsonArray(list) {
-  return JSON.stringify(list ?? [])
 }
 
 // 列表展示的「道会时间」文本：接口没有该字段，按时间类型/固定方式组装。
@@ -131,10 +128,14 @@ export function buildActivityPayload(row) {
   const [specificStart = '', specificEnd = ''] = row.specificRange ?? []
   const isAppointment = row.type === 'appointment'
 
-  // 「线上登记 / 线下亲临」组合态接口无法表达（joinType 只有 1/2），此时不提交该字段。
-  const joinType = row.joinWay === '线上登记'
-    ? activityJoinTypeValue.online
-    : (row.joinWay === '线下亲临' ? activityJoinTypeValue.offline : undefined)
+  // 接口 joinType 只允许 1/2，「线上登记 / 线下亲临」组合态无法表达，统一按线上登记提交，
+  // 避免字段缺失导致服务端处理异常。
+  const joinType = row.joinWay === '线下亲临'
+    ? activityJoinTypeValue.offline
+    : activityJoinTypeValue.online
+
+  // 历史数据的报名截止可能是「每月十四前一天」这类展示文案，不能当日期回写接口。
+  const deadline = /^\d{4}-\d{2}-\d{2}/.test(String(row.deadline ?? '')) ? row.deadline : undefined
 
   return {
     pictureUrls: (row.images ?? []).map((image) => image.url).filter(Boolean).join(','),
@@ -154,11 +155,12 @@ export function buildActivityPayload(row) {
     location: row.location || null,
     joinType,
     limitUser: row.quota === null || row.quota === '' ? null : Number(row.quota),
-    registerEndTime: row.deadline || null,
+    registerEndTime: deadline,
     intro: row.intro || '',
-    yigui: stringifyJsonArray((row.rituals ?? []).map((item) => ({ name: item.title, desc: item.subtitle }))),
-    // 功德利益保留 {name, desc}，官网会把 desc 作为说明文字渲染。
-    benefit: stringifyJsonArray((row.benefits ?? []).map(normalizeBenefit).filter((item) => item.name || item.desc)),
+    // 接口要求 JSON 数组本身（不是 JSON 字符串），元素为 {name, desc}。
+    yigui: (row.rituals ?? []).map((item) => ({ name: item.title, desc: item.subtitle })),
+    // 功德利益与 yigui 同为 JSON 数组，元素 {name, desc}；官网会把 desc 作为说明文字渲染。
+    benefit: (row.benefits ?? []).map(normalizeBenefit).filter((item) => item.name || item.desc),
     matchCrowd: joinByComma(row.audiences),
     type: row.listed ? activityListedValue.on : activityListedValue.off,
     // status 为 null 表示接口未下发状态，保持 null 以便编辑时不提交、不改写原值。

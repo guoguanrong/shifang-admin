@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import LampOrderFilterBar from '../components/order/LampOrderFilterBar.vue'
 import LampOrderTable from '../components/order/LampOrderTable.vue'
 import { getLightList, getOrderList } from '../services/businessApi'
+import { exportOrders as exportOrderList } from '../services/exportApi'
 import { downloadCsv } from '../utils/csv'
 import { mapOrder, orderStatusText, orderStatusValue, orderTypeValue } from '../utils/orderDisplay'
 
@@ -17,6 +18,7 @@ const selection = ref([])
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const exporting = ref(false)
 
 function getList(payload) {
   const result = payload?.data ?? payload
@@ -24,25 +26,30 @@ function getList(payload) {
   return result?.list || result?.records || []
 }
 
-// 拉取点灯订单：固定 type=1，订单号/手机号为接口精确查询，灯名走 lightName，周期走 cycleType。
-async function loadOrders() {
-  loading.value = true
+// /order/list 与 /order/export 使用同一份 OrderDTO：固定 type=1，订单号/手机号精确查询，灯名走 lightName，周期走 cycleType。
+function buildQuery() {
   const { orderId, userPhone, lamp, cycle, status, startDate, endDate } = filters.value
-  const params = {
-    page: currentPage.value,
-    pageSize: PAGE_SIZE,
+  return {
     type: orderTypeValue.lamp,
     orderNo: (orderId || '').trim() || undefined,
     mobile: (userPhone || '').trim() || undefined,
     lightName: lamp || undefined,
-    cycleType: cycle === '' ? undefined : Number(cycle),
+    cycleType: cycle === '' || cycle == null ? undefined : Number(cycle),
     status: status ? orderStatusValue[status] : undefined,
     startTime: startDate ? `${startDate} 00:00:00` : undefined,
     endTime: endDate ? `${endDate} 23:59:59` : undefined,
   }
+}
 
+// 仅列表需要分页；导出直接传 buildQuery()，按筛选条件导出全量。
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
+}
+
+async function loadOrders() {
+  loading.value = true
   try {
-    const payload = await getOrderList(params)
+    const payload = await getOrderList(buildParams())
     const result = payload?.data ?? payload
     orders.value = getList(payload).map(mapOrder)
     const responseTotal = Number(result?.totalRow)
@@ -88,20 +95,21 @@ onMounted(() => {
   loadLampOptions()
 })
 
-// 查看点灯预览：接口没有订单更新类接口，预览图（fileUrl）目前只读，不能后台补传。
+// 预览素材由用户下单时上传，管理端只做展示（可能是图片，也可能是视频）。
 const viewVisible = ref(false)
 const previewImage = ref('')
+const previewVideo = ref('')
 
 function openPreview(order) {
-  previewImage.value = order.previewImage
+  previewImage.value = order.previewImage || ''
+  previewVideo.value = order.previewVideo || ''
   viewVisible.value = true
 }
 
-// 导出订单 CSV：有勾选导勾选，否则导出当前页数据；加 BOM 防止 Excel 打开中文乱码。
-function exportOrders() {
-  const exportRows = selection.value.length ? selection.value : orders.value
+// 勾选行走前端 CSV：/order/export 只支持按筛选条件导出，不支持按 id 列表导出。
+function downloadSelectedOrders() {
   const headers = ['订单号', '用户', '善信手机号', '灯型', '善信姓名', '生辰', '祈福心愿', '数量', '供奉周期', '金额', '状态', '下单时间', '供奉到期时间']
-  const lines = exportRows.map((item) => [
+  const lines = selection.value.map((item) => [
     item.orderNo,
     item.nickname,
     item.userPhone,
@@ -118,6 +126,25 @@ function exportOrders() {
   ])
   downloadCsv('点灯订单.csv', headers, lines)
 }
+
+// 未勾选时调用 /order/export（type=1），按当前筛选条件导出全量点灯订单。
+async function exportOrders() {
+  if (exporting.value) return
+  if (selection.value.length) {
+    downloadSelectedOrders()
+    return
+  }
+
+  exporting.value = true
+  try {
+    await exportOrderList(buildQuery(), '点灯订单')
+    ElMessage.success('点灯订单已导出')
+  } catch (error) {
+    ElMessage.error(error.userMessage || error.message || '导出点灯订单失败')
+  } finally {
+    exporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -132,7 +159,7 @@ function exportOrders() {
     <section class="table-card">
       <div class="table-toolbar">
         <span><b>✓</b> 已选 {{ selection.length }} 项</span>
-        <el-button class="export-button" :disabled="loading" @click="exportOrders">导出订单</el-button>
+        <el-button class="export-button" :loading="exporting" :disabled="loading" @click="exportOrders">导出订单</el-button>
       </div>
 
       <LampOrderTable
@@ -146,10 +173,11 @@ function exportOrders() {
       />
     </section>
 
-    <!-- 查看点灯预览：预览图由前台下单时生成，接口暂无订单图片更新能力 -->
+    <!-- 查看点灯预览：素材由用户下单时上传，可能是图片或视频 -->
     <el-dialog v-model="viewVisible" title="查看点灯预览" width="480px">
-      <img v-if="previewImage" v-media-preview="previewImage" :src="previewImage" class="view-preview" alt="点灯预览图" />
-      <p v-else class="empty-tip">暂无点灯预览图（接口未提供订单预览图上传能力）</p>
+      <video v-if="previewVideo" :src="previewVideo" class="view-preview" controls />
+      <img v-else-if="previewImage" v-media-preview="previewImage" :src="previewImage" class="view-preview" alt="点灯预览图" />
+      <p v-else class="empty-tip">该订单暂无预览素材，预览素材由用户下单时上传</p>
       <template #footer>
         <el-button @click="viewVisible = false">关闭</el-button>
       </template>

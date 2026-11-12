@@ -47,11 +47,20 @@ http.interceptors.request.use((config) => {
 })
 
 // 登录过期业务码：后端返回 {"code":1005,"msg":"登录已过期, 请重新登录"} 时会话已失效。
-const SESSION_EXPIRED_CODE = 1005
+export const SESSION_EXPIRED_CODE = 1005
+
+// 供以 Blob 接收响应的导出等场景复用，保持会话失效处理一致。
+export function handleSessionExpired() {
+  clearStoredSession()
+  redirectToLogin()
+}
 
 // 响应拦截：成功时直接返回业务体；401 或业务码 1005 清理失效会话并回登录页。
 http.interceptors.response.use(
   (response) => {
+    // 文件导出等场景需要读取响应头与原始 Blob，配置 rawResponse 时跳过业务体解包。
+    if (response.config?.rawResponse) return response
+
     const body = response.data
     if (body && typeof body === 'object' && Object.prototype.hasOwnProperty.call(body, 'code')) {
       if (Number(body.code) !== 1000) {

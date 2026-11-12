@@ -50,7 +50,7 @@ const form = reactive({
   startTime: '09:00',
   endTime: '11:00',
   location: '',
-  joinWay: '线上登记 / 线下亲临',
+  joinWay: '线上登记',
   quota: '',
   unlimited: false,
   deadline: '',
@@ -83,7 +83,7 @@ watch(visible, (open) => {
     startTime: source?.startTime ?? '09:00',
     endTime: source?.endTime ?? '11:00',
     location: source?.location ?? '',
-    joinWay: source?.joinWay ?? '线上登记 / 线下亲临',
+    joinWay: source?.joinWay && source.joinWay !== '线上登记 / 线下亲临' ? source.joinWay : '线上登记',
     quota: source ? (source.quota ?? '') : '',
     unlimited: source ? source.quota === null : false,
     deadline: source && /^\d{4}-\d{2}-\d{2}/.test(source.deadline ?? '') ? source.deadline : '',
@@ -372,7 +372,6 @@ async function submitActivity() {
         </el-form-item>
         <el-form-item label="参加方式">
           <el-select v-model="form.joinWay">
-            <el-option label="线上登记 / 线下亲临" value="线上登记 / 线下亲临" />
             <el-option label="线上登记" value="线上登记" />
             <el-option label="线下亲临" value="线下亲临" />
           </el-select>

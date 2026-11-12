@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import DonationItemFilterBar from '../components/donation/DonationItemFilterBar.vue'
 import DonationItemTable from '../components/donation/DonationItemTable.vue'
@@ -12,8 +12,12 @@ import {
   uploadBusinessFile,
 } from '../services/businessApi'
 
+const PAGE_SIZE = 10
+
 const items = ref([])
 const filters = ref({ name: '', status: '' })
+const currentPage = ref(1)
+const total = ref(0)
 const loading = ref(false)
 const saving = ref(false)
 const dialogVisible = ref(false)
@@ -32,35 +36,17 @@ const form = reactive({
   image: '',
 })
 
-const filteredItems = computed(() => {
+// /shopItems/list 的 ShopItemsDTO：名称走 searchKey，状态 1.上架 2.下架。
+function buildQuery() {
   const { name, status } = filters.value
-  const statusValue = status === 'on' ? 1 : status === 'off' ? 2 : null
-  return items.value.filter((item) => (
-    (!name || item.name.includes(name))
-    && (statusValue === null || item.status === statusValue)
-  ))
-})
-
-function getList(payload) {
-  const result = payload?.data ?? payload
-  if (Array.isArray(result)) return result
-  return result?.list || result?.records || []
+  return {
+    searchKey: name.trim() || undefined,
+    status: status === 'on' ? 1 : status === 'off' ? 2 : undefined,
+  }
 }
 
-async function getAllPages(fetchPage) {
-  const records = []
-  let page = 1
-  let totalPage = 1
-  do {
-    const payload = await fetchPage({ page, pageSize: 200 })
-    const result = payload?.data ?? payload
-    const pageRecords = getList(result)
-    records.push(...pageRecords)
-    totalPage = Number(result?.totalPage) || 1
-    if (!pageRecords.length || page >= totalPage) break
-    page += 1
-  } while (page <= 50)
-  return records
+function buildParams() {
+  return { ...buildQuery(), page: currentPage.value, pageSize: PAGE_SIZE }
 }
 
 function normalizeItem(item) {
@@ -77,24 +63,46 @@ function normalizeItem(item) {
   }
 }
 
+// 服务端分页 + 服务端筛选，与项目其它列表页保持一致。
 async function loadItems() {
   loading.value = true
   try {
-    items.value = (await getAllPages(getShopItemsList)).map(normalizeItem)
+    const payload = await getShopItemsList(buildParams())
+    const result = payload?.data ?? payload
+    const totalPage = Number(result?.totalPage)
+    // 当前页超出总页数（如删掉最后一页最后一条）时回退到最后一页重新拉取。
+    if (Number.isFinite(totalPage) && totalPage > 0 && currentPage.value > totalPage) {
+      currentPage.value = totalPage
+      return loadItems()
+    }
+    const list = Array.isArray(result) ? result : result?.list || result?.records || []
+    items.value = list.map(normalizeItem)
+    const responseTotal = Number(result?.totalRow)
+    total.value = Number.isFinite(responseTotal) ? responseTotal : items.value.length
+    return true
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '捐赠物品加载失败')
+    return false
   } finally {
     loading.value = false
   }
 }
 
-function search(formValue) {
-  filters.value = formValue
-  ElMessage.success(`查询完成，共找到 ${filteredItems.value.length} 条物品记录`)
+async function search(formValue) {
+  filters.value = { ...formValue }
+  currentPage.value = 1
+  if (await loadItems()) ElMessage.success(`查询完成，共找到 ${total.value} 条物品记录`)
 }
 
 function reset(formValue) {
-  filters.value = formValue
+  filters.value = { ...formValue }
+  currentPage.value = 1
+  loadItems()
+}
+
+function changePage(page) {
+  currentPage.value = page
+  loadItems()
 }
 
 function clearLocalPreview() {
@@ -274,10 +282,13 @@ onMounted(loadItems)
 
       <DonationItemTable
         v-loading="loading"
-        :items="filteredItems"
+        :items="items"
+        :total="total"
+        :current-page="currentPage"
         @edit="openEdit"
         @toggle="toggleStatus"
         @remove="removeItem"
+        @page-change="changePage"
       />
     </section>
 

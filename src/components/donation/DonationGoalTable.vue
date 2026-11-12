@@ -43,9 +43,16 @@ function progressColor(goal) {
         </div>
       </template>
     </el-table-column>
-    <el-table-column label="捐赠类型" min-width="90">
+    <el-table-column label="捐赠类型" min-width="110">
       <template #default="{ row }">
-        <span :class="['soft-tag', Number(row.type) === 1 ? 'fund' : 'goods']">{{ Number(row.type) === 1 ? '捐钱' : '捐物' }}</span>
+        <!-- 一个目标可同时关联钱档位与实物商品，此时展示两个标签。 -->
+        <div class="type-tags">
+          <span
+            v-for="type in (row.linkedTypes?.length ? row.linkedTypes : [Number(row.type) === 1 ? 1 : 2])"
+            :key="type"
+            :class="['soft-tag', type === 1 ? 'fund' : 'goods']"
+          >{{ type === 1 ? '捐钱' : '捐物' }}</span>
+        </div>
       </template>
     </el-table-column>
     <el-table-column label="目标金额" min-width="110">
@@ -160,6 +167,12 @@ function progressColor(goal) {
     color: var(--admin-text-secondary);
     font-size: 12px;
   }
+}
+
+.type-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .soft-tag {
