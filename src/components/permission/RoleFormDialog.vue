@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../../utils/submitGuard'
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import RolePermissionTree from './RolePermissionTree.vue'
@@ -9,8 +10,11 @@ const props = defineProps({
   role: { type: Object, default: null },
   // menus: POST /menu/list 的 SysMenuVo 树（type 1.目录 2.菜单 3.按钮）
   menus: { type: Array, required: true },
+  saving: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'save'])
+// 弹窗层再挡一次连点，父级 saving 通过 prop 异步回传前也不会重复 emit。
+const { allowSubmit } = useSubmitGuard({ cooldown: 300 })
 const formRef = ref(null)
 const form = reactive({ name: '', key: '' })
 // 提交给 POST /role/setMenu 的 RoleMenuDTO.menuIdList，含目录/菜单/按钮各层节点 id。
@@ -37,6 +41,7 @@ watch(() => props.modelValue, (visible) => {
 })
 
 function submit() {
+  if (props.saving || !allowSubmit()) return
   formRef.value.validate(async (valid) => {
     if (!valid) return
     if (!menuIdList.value.length) {
@@ -76,7 +81,7 @@ function submit() {
     </el-form>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" @click="submit">提交</el-button>
+      <el-button type="primary" :loading="saving" :disabled="saving" @click="submit">提交</el-button>
     </template>
   </el-dialog>
 </template>

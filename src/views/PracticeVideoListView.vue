@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
@@ -11,8 +12,8 @@ import {
   getSportWellnessList,
   saveSportWellness,
   updateSportWellness,
-  uploadBusinessFile,
 } from '../services/businessApi'
+import { useImmediateUpload } from '../utils/immediateUpload'
 
 const PAGE_SIZE = 10
 
@@ -21,10 +22,11 @@ const filters = ref(createPracticeVideoFilters())
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const detailLoading = ref(false)
-const selectedVideoFile = ref(null)
 const localPreviewUrl = ref('')
+const { uploading, uploadFile, runUpload } = useImmediateUpload()
+let uploadToken = 0
 
 function search(form) {
   filters.value = { ...form }
@@ -228,22 +230,38 @@ async function openEdit(video) {
 }
 
 function clearLocalPreview() {
+  uploadToken += 1
   if (localPreviewUrl.value) URL.revokeObjectURL(localPreviewUrl.value)
   localPreviewUrl.value = ''
-  selectedVideoFile.value = null
 }
 
-function onVideoChange(event) {
+// 选中视频立即上传：form.videoUrl 始终是服务端 URL，本地 blob 仅用于上传期间预览。
+async function onVideoChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
+  const previousUrl = form.videoUrl
   clearLocalPreview()
-  selectedVideoFile.value = file
+  const token = uploadToken
   localPreviewUrl.value = URL.createObjectURL(file)
+
+  await runUpload(async () => {
+    try {
+      const url = await uploadFile(file, '视频')
+      if (token !== uploadToken) return
+      form.videoUrl = url
+      ElMessage.success('视频上传成功')
+    } catch (error) {
+      if (token !== uploadToken) return
+      clearLocalPreview()
+      form.videoUrl = previousUrl
+      ElMessage.error(error.userMessage || error.message || '视频上传失败')
+    }
+  })
 }
 
 async function submitVideo() {
-  if (saving.value || detailLoading.value) return
+  if (uploading.value || detailLoading.value || !allowSubmit()) return
   if (!form.title.trim()) {
     ElMessage.warning('请输入视频标题')
     return
@@ -252,7 +270,7 @@ async function submitVideo() {
     ElMessage.warning('请输入正确的时长')
     return
   }
-  if (!form.videoUrl && !selectedVideoFile.value) {
+  if (!form.videoUrl) {
     ElMessage.warning('请先上传跟练视频文件')
     return
   }
@@ -271,7 +289,6 @@ async function submitVideo() {
 
   const isEdit = editingId.value !== null
   const id = editingId.value
-  const selectedFile = selectedVideoFile.value
   const payload = {
     title: form.title.trim(),
     intro: form.intro.trim(),
@@ -285,13 +302,7 @@ async function submitVideo() {
 
   saving.value = true
   try {
-    let videoUrl = form.videoUrl
-    if (selectedFile) {
-      const uploadedFile = await uploadBusinessFile(selectedFile)
-      videoUrl = uploadedFile?.url
-      if (!videoUrl) throw new Error('视频上传成功但未返回视频地址')
-    }
-    const requestBody = { ...payload, videoUrl }
+    const requestBody = { ...payload, videoUrl: form.videoUrl }
 
     if (isEdit) {
       await updateSportWellness({ ...requestBody, id })
@@ -306,7 +317,7 @@ async function submitVideo() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存跟练视频失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 
 }
@@ -344,14 +355,14 @@ onMounted(loadVideos)
       title="新增/编辑"
       width="600px"
       top="4vh"
-      :close-on-click-modal="!saving"
-      :show-close="!saving"
+      :close-on-click-modal="!saving && !uploading"
+      :show-close="!saving && !uploading"
       @closed="clearLocalPreview"
     >
       <el-form v-loading="detailLoading" class="video-form" label-position="top" @submit.prevent>
         <el-form-item label="视频文件">
           <label class="upload-box">
-            <input type="file" accept="video/*" @change="onVideoChange" />
+            <input type="file" accept="video/*" :disabled="uploading || saving" @change="onVideoChange" />
             <video v-if="localPreviewUrl || form.videoUrl" :src="localPreviewUrl || form.videoUrl" class="upload-preview" controls />
             <template v-else>
               <span class="upload-icon">
@@ -359,8 +370,9 @@ onMounted(loadVideos)
                 上传视频
               </span>
             </template>
+            <span v-if="uploading" class="upload-mask">上传中…</span>
           </label>
-          <p class="field-tip">跟练视频文件,最多 1 个</p>
+          <p class="field-tip">{{ uploading ? '视频上传中，请稍候…' : '跟练视频文件,最多 1 个' }}</p>
         </el-form-item>
 
         <el-form-item label="视频标题" required>
@@ -402,8 +414,8 @@ onMounted(loadVideos)
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button :disabled="saving" @click="dialogVisible = false">取消</el-button>
-        <el-button class="save-button" :loading="saving" :disabled="detailLoading" @click="submitVideo">提交</el-button>
+        <el-button :disabled="uploading || saving" @click="dialogVisible = false">取消</el-button>
+        <el-button class="save-button" :loading="saving" :disabled="uploading || detailLoading" @click="submitVideo">提交</el-button>
       </template>
     </el-dialog>
   </main>
@@ -476,6 +488,7 @@ onMounted(loadVideos)
 }
 
 .upload-box {
+  position: relative;
   width: 100%;
   min-height: 96px;
   display: flex;

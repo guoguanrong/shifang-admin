@@ -47,7 +47,8 @@ async function loadOrders() {
   try {
     const payload = await getOrderList(buildParams())
     const result = payload?.data ?? payload
-    orders.value = getList(payload).map(mapOrder)
+    // 供奉订单的 fileUrl 是图片（接口描述：点灯视频或供奉图片）。
+    orders.value = getList(payload).map((item) => mapOrder(item, 'image'))
     const responseTotal = Number(result?.totalRow)
     total.value = Number.isFinite(responseTotal) ? responseTotal : orders.value.length
     const responsePage = Number(result?.currentPage)

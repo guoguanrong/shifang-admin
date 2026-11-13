@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../../utils/submitGuard'
 import { computed, reactive, ref, watch } from 'vue'
 
 // 菜单新增/编辑弹窗：字段按 SysMenu 定义（required: title、type），
@@ -11,8 +12,11 @@ const props = defineProps({
   defaultType: { type: Number, default: 1 },
   // 上级菜单树：[{ id: 0, title: '主类目', children: [...] }]
   parentOptions: { type: Array, default: () => [] },
+  saving: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'save'])
+// 弹窗层再挡一次连点，父级 saving 通过 prop 异步回传前也不会重复 emit。
+const { allowSubmit } = useSubmitGuard({ cooldown: 300 })
 
 const TYPE_OPTIONS = [
   { label: '目录', value: 1 },
@@ -97,6 +101,7 @@ function buildPayload() {
 }
 
 function submit() {
+  if (props.saving || !allowSubmit()) return
   formRef.value.validate(async (valid) => {
     if (!valid) return
     emit('save', buildPayload())
@@ -208,7 +213,7 @@ function submit() {
 
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" @click="submit">确定</el-button>
+      <el-button type="primary" :loading="saving" :disabled="saving" @click="submit">确定</el-button>
     </template>
   </el-dialog>
 </template>

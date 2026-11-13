@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ClassicFilterBar from '../components/wellness/ClassicFilterBar.vue'
@@ -22,7 +23,7 @@ const total = ref(0)
 const loading = ref(false)
 const detailLoading = ref(false)
 const uploading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 
 function toBoolean(value) {
   return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true'
@@ -240,7 +241,7 @@ async function onCoverChange(event) {
 }
 
 async function submitClassic() {
-  if (saving.value || uploading.value || detailLoading.value) return
+  if (uploading.value || detailLoading.value || !allowSubmit()) return
   if (!form.title.trim()) {
     ElMessage.warning('请输入文章标题')
     return
@@ -283,7 +284,7 @@ async function submitClassic() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存道典精读失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 

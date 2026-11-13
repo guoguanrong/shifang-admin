@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import DonationGoalTable from '../components/donation/DonationGoalTable.vue'
@@ -10,8 +11,8 @@ import {
   getShopItemsList,
   saveDonateTarget,
   updateDonateTarget,
-  uploadBusinessFile,
 } from '../services/businessApi'
+import { useImmediateUpload } from '../utils/immediateUpload'
 import { syncTierShopItems, tierPricesFromShopItems, validateTierPrices } from '../utils/shopItemTiers'
 
 const MAX_GOODS = 6
@@ -19,12 +20,13 @@ const MAX_GOODS = 6
 const goals = ref([])
 const shopItems = ref([])
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const dialogVisible = ref(false)
 const formRef = ref()
 const editingId = ref(null)
-const selectedImageFile = ref(null)
 const localPreviewUrl = ref('')
+const { uploading, uploadFile, runUpload } = useImmediateUpload()
+let uploadToken = 0
 // 捐钱档位与捐物商品可以并存：两者最终都写进 donateTarget.shopItemsIds（混合商品 id）。
 const form = reactive({
   title: '',
@@ -125,9 +127,9 @@ async function loadPage() {
 }
 
 function clearLocalPreview() {
+  uploadToken += 1
   if (localPreviewUrl.value) URL.revokeObjectURL(localPreviewUrl.value)
   localPreviewUrl.value = ''
-  selectedImageFile.value = null
 }
 
 function resetForm() {
@@ -281,14 +283,29 @@ async function openEdit(goal) {
   if (editingId.value === targetId) await loadLinkedShopItems(targetId)
 }
 
-function onImageChange(event) {
+// 选中图片立即上传：form.image 始终是服务端 URL，本地 blob 仅用于上传期间预览。
+async function onImageChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
+  const previousImage = form.image
   clearLocalPreview()
-  selectedImageFile.value = file
+  const token = uploadToken
   localPreviewUrl.value = URL.createObjectURL(file)
-  form.image = localPreviewUrl.value
+
+  await runUpload(async () => {
+    try {
+      const url = await uploadFile(file, '图片')
+      if (token !== uploadToken) return
+      form.image = url
+      ElMessage.success('图片上传成功')
+    } catch (error) {
+      if (token !== uploadToken) return
+      clearLocalPreview()
+      form.image = previousImage
+      ElMessage.error(error.userMessage || error.message || '图片上传失败')
+    }
+  })
 }
 
 function validateMoney(_rule, value, callback) {
@@ -305,7 +322,7 @@ const rules = {
 }
 
 async function submitGoal() {
-  if (saving.value) return
+  if (uploading.value || !allowSubmit()) return
   try {
     await formRef.value.validate()
   } catch {
@@ -331,13 +348,7 @@ async function submitGoal() {
 
   saving.value = true
   try {
-    let picture = form.image
-    if (selectedImageFile.value) {
-      const uploadedFile = await uploadBusinessFile(selectedImageFile.value)
-      picture = uploadedFile?.url
-      if (!picture) throw new Error('图片上传成功但未返回图片地址')
-    }
-    const finalPicture = picture || ''
+    const finalPicture = form.image || ''
     let tierIds = []
 
     if (hasTiers) {
@@ -376,7 +387,7 @@ async function submitGoal() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存捐赠目标失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 
@@ -417,17 +428,18 @@ onMounted(loadPage)
       />
     </section>
 
-    <el-dialog v-model="dialogVisible" title="新增/编辑" width="640px">
+    <el-dialog v-model="dialogVisible" title="新增/编辑" width="640px" @closed="clearLocalPreview">
       <el-form ref="formRef" class="goal-form" :model="form" :rules="rules" label-position="top">
         <el-form-item label="目标效果图">
           <label class="upload-box">
-            <input type="file" accept="image/*" @change="onImageChange" />
-            <img v-if="form.image" :src="form.image" class="upload-preview" alt="目标效果图预览" />
+            <input type="file" accept="image/*" :disabled="uploading || saving" @change="onImageChange" />
+            <img v-if="localPreviewUrl || form.image" :src="localPreviewUrl || form.image" class="upload-preview" alt="目标效果图预览" />
             <template v-else>
               <span class="upload-icon">⬆</span>
               <strong>点击上传目标效果图</strong>
               <span class="upload-tip">仅限 1 张 · 建议尺寸 800 × 800</span>
             </template>
+            <span v-if="uploading" class="upload-mask">上传中…</span>
           </label>
         </el-form-item>
         <el-form-item label="目标主标题" prop="title">
@@ -473,8 +485,8 @@ onMounted(loadPage)
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button class="save-button" :loading="saving" @click="submitGoal">{{ editingId ? '保存修改' : '发布即开始筹款' }}</el-button>
+        <el-button :disabled="uploading || saving" @click="dialogVisible = false">取消</el-button>
+        <el-button class="save-button" :loading="saving" :disabled="uploading" @click="submitGoal">{{ editingId ? '保存修改' : '发布即开始筹款' }}</el-button>
       </template>
     </el-dialog>
 

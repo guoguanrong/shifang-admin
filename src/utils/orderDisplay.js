@@ -67,16 +67,26 @@ export function mapDonationOrder(order, shopItemNames = {}) {
   }
 }
 
-// OrderVo.fileUrl 既可能是图片也可能是视频，预览弹窗需按扩展名区分渲染。
+// OrderVo.fileUrl 语义由订单类型决定：1 点灯→视频，2 供奉→图片。
+// 下载地址常是 /sys/file/download/{id} 这类无扩展名形式，仅靠扩展名会把视频误判成图片。
 const VIDEO_URL_RE = /\.(mp4|webm|mov|m4v)(\?|$)/i
 export function isVideoFileUrl(url) {
   return VIDEO_URL_RE.test(String(url || ''))
 }
 
-// OrderVo → 表格行。
-export function mapOrder(order) {
+function isVideoOrderFile(order) {
+  const type = Number(order.type)
+  if (type === orderTypeValue.lamp) return true
+  if (type === orderTypeValue.offering) return false
+  return isVideoFileUrl(order.fileUrl)
+}
+
+// OrderVo → 表格行。调用方可按页面语义指定 mediaType，避免后端未返回 type 时误判素材。
+export function mapOrder(order, mediaType = '') {
   const fileUrl = order.fileUrl || ''
-  const isVideo = isVideoFileUrl(fileUrl)
+  const isVideo = mediaType === 'video' || mediaType === 'image'
+    ? mediaType === 'video'
+    : isVideoOrderFile(order)
   return {
     id: order.id,
     orderNo: order.orderNo || '—',

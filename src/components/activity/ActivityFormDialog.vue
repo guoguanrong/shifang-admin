@@ -1,8 +1,9 @@
 <script setup>
+import { useSubmitGuard } from '../../utils/submitGuard'
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDataOptions } from '../../services/dataSource'
-import { uploadBusinessFile } from '../../services/businessApi'
+import { useImmediateUpload } from '../../utils/immediateUpload'
 
 // 新增/编辑活动弹窗：基本信息（图片/标题/副标题/标签）、法会信息（类型/时间/地点/报名）、
 // 内容详情（简介/仪轨/功德利益/适用人群）、上架状态。保存时向上抛出 save 事件。
@@ -17,6 +18,9 @@ const emit = defineEmits(['update:modelValue', 'save'])
 const MAX_IMAGES = 6
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 const activityLocationOptions = getDataOptions('activityLocations')
+const { uploading, uploadFile, runUpload } = useImmediateUpload()
+// 弹窗层再挡一次连点，父级 saving 通过 prop 异步回传前也不会重复 emit。
+const { allowSubmit } = useSubmitGuard({ cooldown: 300 })
 
 // 报名状态字典：与接口 Activity.status 一致（1.待报名 2.报名中 3.报名停止 4.已结束）。
 // 选「待报名」的道会全部展示在官网「道会活动 · 未来规划」中。
@@ -64,6 +68,7 @@ const form = reactive({
 
 // 每次打开时以传入活动为基准回填（新增则使用默认值）。
 watch(visible, (open) => {
+  revokeImagePreviews()
   if (!open) return
   const source = props.activity
   originalDeadline.value = source?.deadline ?? ''
@@ -98,22 +103,45 @@ watch(visible, (open) => {
   })
 })
 
-// 活动图片：本地多选追加，最多 6 张（重复选择会覆盖空位）。
-function onImagesChange(event) {
+// 活动图片：选中即逐张上传，拿到服务端 URL 后才写入表单；本地 blob 仅用于即时预览。
+async function onImagesChange(event) {
   const files = Array.from(event.target.files ?? [])
   event.target.value = ''
-  for (const file of files) {
-    if (form.images.length >= MAX_IMAGES) {
-      ElMessage.warning(`最多上传 ${MAX_IMAGES} 张图片`)
-      break
+  if (!files.length) return
+
+  await runUpload(async () => {
+    for (const file of files) {
+      if (form.images.length >= MAX_IMAGES) {
+        ElMessage.warning(`最多上传 ${MAX_IMAGES} 张图片`)
+        break
+      }
+      const previewUrl = URL.createObjectURL(file)
+      const image = { url: '', previewUrl, label: '', caption: '' }
+      form.images.push(image)
+      try {
+        const url = await uploadFile(file, '图片')
+        // 上传期间用户可能删除了该图或关闭了弹窗，此时不再回填。
+        if (!form.images.includes(image)) continue
+        image.url = url
+      } catch (error) {
+        const index = form.images.indexOf(image)
+        if (index >= 0) removeImage(index)
+        ElMessage.error(error.userMessage || error.message || '图片上传失败')
+        break
+      }
     }
-    form.images.push({ url: URL.createObjectURL(file), file, label: '', caption: '' })
-  }
+  })
 }
 
 function removeImage(index) {
   const [removed] = form.images.splice(index, 1)
-  if (removed?.url) URL.revokeObjectURL(removed.url)
+  if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+}
+
+function revokeImagePreviews() {
+  form.images.forEach((image) => {
+    if (image.previewUrl) URL.revokeObjectURL(image.previewUrl)
+  })
 }
 
 // 标签/适用人群：通过弹窗输入追加，去重。
@@ -160,22 +188,6 @@ function removeBenefit(index) {
   form.benefits.splice(index, 1)
 }
 
-// 本地新选的图先上传到文件服务，返回可提交的图片列表（已有 URL 的图原样保留）。
-async function uploadPendingImages(images) {
-  const result = []
-  for (const image of images) {
-    if (image.file) {
-      const uploaded = await uploadBusinessFile(image.file)
-      const url = uploaded?.url
-      if (!url) throw new Error('图片上传成功但未返回图片地址')
-      result.push({ ...image, url, file: undefined })
-      continue
-    }
-    if (image.url) result.push({ ...image })
-  }
-  return result
-}
-
 // 依据表单生成列表展示的「活动时间」文本。
 function buildTimeText() {
   if (form.type === 'appointment') {
@@ -192,9 +204,13 @@ function buildTimeText() {
   return `每周${WEEKDAYS[form.weekday]} ${form.startTime} - ${form.endTime}`
 }
 
-// 提交：标题必填，图片先上传，再组装 payload 交由父级写入接口。
+// 提交：标题必填，图片 URL 在选中时已上传完成，直接组装 payload 交由父级写入接口。
 async function submitActivity() {
-  if (props.saving) return
+  if (uploading.value || props.saving || !allowSubmit()) return
+  if (form.images.some((image) => !image.url)) {
+    ElMessage.warning('图片尚未上传完成，请稍后再提交')
+    return
+  }
   if (!form.title.trim()) {
     ElMessage.warning('请输入活动标题')
     return
@@ -216,20 +232,11 @@ async function submitActivity() {
     return
   }
 
-  // 本地新选的图先上传，拿到正式 URL 后再提交（接口 pictureUrls 只保存逗号串）。
-  let images
-  try {
-    images = await uploadPendingImages(form.images)
-  } catch (error) {
-    ElMessage.error(error.userMessage || error.message || '活动图片上传失败')
-    return
-  }
-
   emit('save', {
     title: form.title.trim(),
     subtitle: form.subtitle.trim(),
     tags: [...form.tags],
-    images,
+    images: form.images.map(({ url, label, caption }) => ({ url, label, caption })),
     aheadDays: form.aheadDays === '' ? null : Number(form.aheadDays),
     specificRange: [...specificRange.value],
     type: form.type,
@@ -264,18 +271,19 @@ async function submitActivity() {
       <el-form-item label="活动图片 (最多 6 张)">
         <div class="image-grid">
           <div v-for="(image, index) in form.images" :key="index" class="image-tile">
-            <img v-if="image.url" :src="image.url" alt="活动图片" />
+            <img v-if="image.previewUrl || image.url" :src="image.previewUrl || image.url" alt="活动图片" />
             <template v-else>
               <strong>{{ image.label }}</strong>
               <span>{{ image.caption }}</span>
             </template>
+            <span v-if="!image.url" class="tile-uploading">上传中…</span>
             <i class="tile-remove" role="button" tabindex="0" @click="removeImage(index)" @keydown.enter.prevent="removeImage(index)">×</i>
           </div>
           <label v-if="form.images.length < MAX_IMAGES" class="image-add">
-            <input type="file" accept="image/*" multiple @change="onImagesChange" />
+            <input type="file" accept="image/*" multiple :disabled="uploading || saving" @change="onImagesChange" />
             <span class="add-body">
               <span class="add-icon">＋</span>
-              <span class="add-text">上传图片</span>
+              <span class="add-text">{{ uploading ? '上传中…' : '上传图片' }}</span>
               <em>{{ form.images.length }}/{{ MAX_IMAGES }}</em>
             </span>
           </label>
@@ -404,11 +412,11 @@ async function submitActivity() {
       </el-form-item>
 
       <el-form-item label="法会仪轨">
-        <div class="ritual-list">
-          <div v-for="(ritual, index) in form.rituals" :key="index" class="ritual-item">
-            <span class="ritual-index">{{ index + 1 }}</span>
-            <div class="ritual-fields">
-              <div class="ritual-line">
+        <div class="entry-list">
+          <div v-for="(ritual, index) in form.rituals" :key="index" class="entry-item">
+            <span class="entry-index">{{ index + 1 }}</span>
+            <div class="entry-fields">
+              <div class="entry-line">
                 <el-input v-model="ritual.title" placeholder="请输入仪轨名称" maxlength="30" />
                 <el-button class="mini-remove" @click="removeRitual(index)">删除</el-button>
               </div>
@@ -421,11 +429,15 @@ async function submitActivity() {
       </el-form-item>
 
       <el-form-item label="参加法会的功德利益">
-        <div class="benefit-list">
-          <div v-for="(benefit, index) in form.benefits" :key="index" class="benefit-line">
-            <el-input v-model="benefit.name" class="benefit-name" placeholder="请输入功德利益" maxlength="50" />
-            <el-input v-model="benefit.desc" placeholder="请输入说明" maxlength="120" />
-            <el-button class="mini-remove" @click="removeBenefit(index)">删除</el-button>
+        <div class="entry-list">
+          <div v-for="(benefit, index) in form.benefits" :key="index" class="entry-item">
+            <div class="entry-fields">
+              <div class="entry-line">
+                <el-input v-model="benefit.name" placeholder="请输入功德利益" maxlength="50" />
+                <el-button class="mini-remove" @click="removeBenefit(index)">删除</el-button>
+              </div>
+              <el-input v-model="benefit.desc" placeholder="请输入说明" maxlength="120" />
+            </div>
           </div>
           <el-button class="chip-add" @click="addBenefit">+ 新增功德利益</el-button>
         </div>
@@ -457,8 +469,8 @@ async function submitActivity() {
     </el-form>
 
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button class="save-button" :loading="saving" @click="submitActivity">提交</el-button>
+      <el-button :disabled="uploading" @click="visible = false">取消</el-button>
+      <el-button class="save-button" :loading="saving" :disabled="uploading || saving" @click="submitActivity">提交</el-button>
     </template>
   </el-dialog>
 </template>
@@ -508,6 +520,16 @@ async function submitActivity() {
     color: rgba(255, 255, 255, 0.65);
     font-size: 10px;
     transform: scale(0.9);
+  }
+
+  .tile-uploading {
+    position: absolute;
+    inset: auto 0 0;
+    padding: 2px 0;
+    color: #f0e8d8;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.55);
+    transform: none;
   }
 }
 
@@ -598,13 +620,13 @@ async function submitActivity() {
   }
 }
 
-.ritual-list,
-.benefit-list {
+// 法会仪轨与功德利益共用同一套行结构：序号列 + 名称/说明两行 + 右侧删除按钮。
+.entry-list {
   width: 100%;
   min-width: 0;
 }
 
-.ritual-item {
+.entry-item {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
   gap: 10px;
@@ -612,7 +634,7 @@ async function submitActivity() {
   margin-bottom: 10px;
 }
 
-.ritual-index {
+.entry-index {
   width: 22px;
   height: 22px;
   aspect-ratio: 1;
@@ -629,15 +651,16 @@ async function submitActivity() {
   border-radius: 50%;
 }
 
-.ritual-fields {
+// 功德利益没有序号，仍占第二列，保证与法会仪轨的输入框左右对齐。
+.entry-fields {
+  grid-column: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.ritual-line,
-.benefit-line {
+.entry-line {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -650,10 +673,6 @@ async function submitActivity() {
 
   .mini-remove {
     flex: 0 0 auto;
-  }
-
-  .benefit-name {
-    flex: 0 0 160px;
   }
 }
 

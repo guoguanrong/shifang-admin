@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Document, EditPen, Grid, Menu as MenuIcon, Plus, Refresh, Setting, Tools, User } from '@element-plus/icons-vue'
@@ -15,6 +16,7 @@ const iconMap = { Menu: MenuIcon, Grid, Document, Setting, Tools, User }
 const menus = ref([])
 const treeData = ref([])
 const loading = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const filters = reactive(createMenuFilters())
 const applied = reactive(createMenuFilters())
 const selection = ref([])
@@ -232,6 +234,8 @@ async function batchRemove() {
 }
 
 async function saveMenu(payload) {
+  if (!allowSubmit()) return
+  saving.value = true
   try {
     if (editingMenu.value) await updateSysMenu({ id: editingMenu.value.id, ...payload })
     else await saveSysMenu(payload)
@@ -240,6 +244,8 @@ async function saveMenu(payload) {
     await loadMenus()
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存菜单失败')
+  } finally {
+    endSubmit()
   }
 }
 
@@ -339,6 +345,7 @@ onMounted(loadMenus)
       :parent-id="presetParentId"
       :default-type="presetType"
       :parent-options="parentOptions"
+      :saving="saving"
       @save="saveMenu"
     />
   </main>

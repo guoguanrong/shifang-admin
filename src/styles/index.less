@@ -35,6 +35,19 @@ body {
   &:focus-visible { outline: 2px solid var(--admin-primary); outline-offset: 2px; }
 }
 
+// 选中即上传时覆盖在上传框上的「上传中」提示，各业务模块共用。
+.upload-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--admin-text-inverse);
+  font-size: 13px;
+  background: rgba(20, 26, 24, 0.55);
+  border-radius: var(--admin-radius-md);
+}
+
 button,
 input {
   font: inherit;

@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { computed, h, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AccountFilterBar from '../components/account/AccountFilterBar.vue'
@@ -41,6 +42,7 @@ const filters = ref(createAccountFilters())
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const dialogVisible = ref(false)
 const editingAccount = ref(null)
 
@@ -111,6 +113,8 @@ function openEdit(account) {
 
 // 保存账号：新增带默认密码，角色走 roleIdList；编辑时提交 id。
 async function saveAccount(payload) {
+  if (!allowSubmit()) return
+  saving.value = true
   const base = {
     username: payload.username,
     nickname: payload.name,
@@ -129,6 +133,8 @@ async function saveAccount(payload) {
     await loadAccounts()
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存账号失败')
+  } finally {
+    endSubmit()
   }
 }
 
@@ -244,6 +250,7 @@ onMounted(() => {
       :account="editingAccount"
       :roles="roles"
       :account-names="accountNames"
+      :saving="saving"
       @save="saveAccount"
     />
   </main>

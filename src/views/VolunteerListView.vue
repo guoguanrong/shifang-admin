@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshRight, CircleClose } from '@element-plus/icons-vue'
@@ -25,7 +26,7 @@ const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const exporting = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const togglingId = ref(null)
 
 // VolunteerVo → 表格行：姓名 username、岗位 applyPost、可服务时间 serviceTime、加入时间 createTime、留言 remark。
@@ -141,7 +142,7 @@ function openAdd() {
 
 // 保存并录入：调用新增义工接口，直接以正常状态入册（本页语义就是已通过审核的义工），后台添加 type=2。
 async function submitAdd() {
-  if (saving.value) return
+  if (!allowSubmit()) return
   try {
     await formRef.value.validate()
   } catch {
@@ -166,7 +167,7 @@ async function submitAdd() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '义工录入失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 

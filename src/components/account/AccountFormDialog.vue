@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../../utils/submitGuard'
 import { reactive, ref, watch } from 'vue'
 
 const props = defineProps({
@@ -6,8 +7,11 @@ const props = defineProps({
   account: { type: Object, default: null },
   roles: { type: Array, required: true },
   accountNames: { type: Array, default: () => [] },
+  saving: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'save'])
+// 弹窗层再挡一次连点，父级 saving 通过 prop 异步回传前也不会重复 emit。
+const { allowSubmit } = useSubmitGuard({ cooldown: 300 })
 const formRef = ref(null)
 const form = reactive({ username: '', name: '', roleId: '', status: 'enabled' })
 
@@ -66,6 +70,7 @@ watch(() => props.modelValue, (visible) => {
 })
 
 async function submit() {
+  if (props.saving || !allowSubmit()) return
   try {
     await formRef.value.validate()
   } catch {
@@ -118,7 +123,7 @@ async function submit() {
     </el-form>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button type="primary" @click="submit">提交</el-button>
+      <el-button type="primary" :loading="saving" :disabled="saving" @click="submit">提交</el-button>
     </template>
   </el-dialog>
 </template>

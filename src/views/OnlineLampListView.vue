@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import OnlineLampCards from '../components/online/OnlineLampCards.vue'
@@ -11,20 +12,22 @@ import {
   getWorshipList,
   saveLight,
   updateLight,
-  uploadBusinessFile,
 } from '../services/businessApi'
+import { useImmediateUpload } from '../utils/immediateUpload'
 import { lampDeityOptions } from '../mock/onlineLamps'
 
 const lamps = ref([])
 const materials = ref([])
 const deityOptions = ref([...lampDeityOptions])
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const editVisible = ref(false)
 const materialDialogVisible = ref(false)
 const currentLamp = ref(null)
-const selectedImageFile = ref(null)
 const localPreviewUrl = ref('')
+const { uploading, uploadFile, runUpload } = useImmediateUpload()
+// 每次重新选择/关闭弹窗都让进行中的上传失效，避免旧图 URL 覆盖新选择。
+let uploadToken = 0
 const form = reactive({
   name: '',
   image: '',
@@ -113,9 +116,9 @@ function isDeityTaken(deity) {
 }
 
 function clearLocalPreview() {
+  uploadToken += 1
   if (localPreviewUrl.value) URL.revokeObjectURL(localPreviewUrl.value)
   localPreviewUrl.value = ''
-  selectedImageFile.value = null
 }
 
 function resetForm() {
@@ -158,14 +161,29 @@ async function openEdit(lamp) {
   }
 }
 
-function onImageChange(event) {
+// 选中图片立即上传：form.image 始终是服务端 URL，本地 blob 仅用于上传期间预览。
+async function onImageChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
+  const previousImage = form.image
   clearLocalPreview()
-  selectedImageFile.value = file
+  const token = uploadToken
   localPreviewUrl.value = URL.createObjectURL(file)
-  form.image = localPreviewUrl.value
+
+  await runUpload(async () => {
+    try {
+      const url = await uploadFile(file, '图片')
+      if (token !== uploadToken) return
+      form.image = url
+      ElMessage.success('图片上传成功')
+    } catch (error) {
+      if (token !== uploadToken) return
+      clearLocalPreview()
+      form.image = previousImage
+      ElMessage.error(error.userMessage || error.message || '图片上传失败')
+    }
+  })
 }
 
 function removeMaterial(materialId) {
@@ -177,7 +195,7 @@ function applyMaterials(ids) {
 }
 
 async function submitLamp() {
-  if (saving.value) return
+  if (uploading.value || !allowSubmit()) return
   if (!form.name.trim()) {
     ElMessage.warning('请输入灯的名称')
     return
@@ -210,15 +228,8 @@ async function submitLamp() {
 
   saving.value = true
   try {
-    let picture = form.image
-    if (selectedImageFile.value) {
-      const uploadedFile = await uploadBusinessFile(selectedImageFile.value)
-      picture = uploadedFile?.url
-      if (!picture) throw new Error('图片上传成功但未返回图片地址')
-    }
-
     const payload = {
-      picture: picture || '',
+      picture: form.image || '',
       name: form.name.trim(),
       desc: form.desc.trim(),
       dayPrice: Number(form.dayPrice),
@@ -240,7 +251,7 @@ async function submitLamp() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '点灯配置保存失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 
@@ -285,13 +296,14 @@ onMounted(loadPage)
         </el-form-item>
         <el-form-item label="灯图片" required>
           <label class="upload-box">
-            <input type="file" accept="image/*" :disabled="saving" @change="onImageChange" />
-            <img v-if="form.image" :src="form.image" class="upload-preview" alt="灯图片预览" />
+            <input type="file" accept="image/*" :disabled="uploading || saving" @change="onImageChange" />
+            <img v-if="localPreviewUrl || form.image" :src="localPreviewUrl || form.image" class="upload-preview" alt="灯图片预览" />
             <template v-else>
               <span class="upload-icon">⬆</span>
               <strong>点击上传灯图片</strong>
               <span class="upload-tip">仅限 1 张 · 建议尺寸 400 × 400</span>
             </template>
+            <span v-if="uploading" class="upload-mask">上传中…</span>
           </label>
         </el-form-item>
         <el-form-item label="灯盏描述" required>
@@ -342,8 +354,8 @@ onMounted(loadPage)
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button :disabled="saving" @click="editVisible = false">取消</el-button>
-        <el-button class="save-button" :loading="saving" @click="submitLamp">提交</el-button>
+        <el-button :disabled="uploading || saving" @click="editVisible = false">取消</el-button>
+        <el-button class="save-button" :loading="saving" :disabled="uploading" @click="submitLamp">提交</el-button>
       </template>
     </el-dialog>
 

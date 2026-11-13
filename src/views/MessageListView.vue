@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay } from '@element-plus/icons-vue'
@@ -25,7 +26,7 @@ const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const uploading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 
 function toBoolean(value) {
   return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true'
@@ -319,7 +320,7 @@ onUnmounted(releaseFormPreviews)
 
 // 提交：校验通过后新增（置顶）或更新寄语。
 async function submitMessage() {
-  if (uploading.value || saving.value) return
+  if (uploading.value || !allowSubmit()) return
   if (!form.category) {
     ElMessage.warning('请选择分类')
     return
@@ -367,7 +368,7 @@ async function submitMessage() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存寄语失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 </script>

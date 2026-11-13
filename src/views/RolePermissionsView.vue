@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { computed, h, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RoleTable from '../components/permission/RoleTable.vue'
@@ -41,6 +42,7 @@ function buildMenuTree(list) {
 const roles = ref([])
 const menus = ref([])
 const loading = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const searchInput = ref('')
 const searchName = ref('')
 const formVisible = ref(false)
@@ -132,6 +134,8 @@ function openView(role) {
 
 // 保存角色：基本信息走 save/update，权限勾选单独走 setMenu。
 async function saveRole(payload) {
+  if (!allowSubmit()) return
+  saving.value = true
   try {
     let roleId = editingRole.value?.id
     if (editingRole.value) {
@@ -154,6 +158,8 @@ async function saveRole(payload) {
     await loadRoles()
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存角色失败')
+  } finally {
+    endSubmit()
   }
 }
 
@@ -215,6 +221,7 @@ onMounted(() => {
       v-model="formVisible"
       :role="editingRole"
       :menus="menus"
+      :saving="saving"
       @save="saveRole"
     />
     <!-- 查看权限：只读、只展示已授权项，分组默认展开（与原型一致，无底部按钮）。 -->

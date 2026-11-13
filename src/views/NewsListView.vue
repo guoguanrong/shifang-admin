@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import NewsFilterBar from '../components/news/NewsFilterBar.vue'
@@ -21,7 +22,7 @@ const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
 const uploading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 
 function toBoolean(value) {
   return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true'
@@ -250,7 +251,7 @@ function removeImage(index) {
 
 // 提交：校验通过后新增或更新动态（编辑时保持原有展示状态）。
 async function submitNews() {
-  if (uploading.value || saving.value) return
+  if (uploading.value || !allowSubmit()) return
   if (!form.title.trim()) {
     ElMessage.warning('请输入动态标题')
     return
@@ -282,7 +283,7 @@ async function submitNews() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存动态失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 </script>
@@ -342,7 +343,7 @@ async function submitNews() {
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button class="save-button" :loading="saving" @click="submitNews">提交</el-button>
+        <el-button class="save-button" :loading="saving" :disabled="saving" @click="submitNews">提交</el-button>
       </template>
     </el-dialog>
   </main>

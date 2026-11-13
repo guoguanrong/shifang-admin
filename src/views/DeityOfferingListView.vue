@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import DeityOfferingCards from '../components/deity/DeityOfferingCards.vue'
@@ -9,19 +10,20 @@ import {
   getWorshipList,
   saveWorship,
   updateWorship,
-  uploadBusinessFile,
 } from '../services/businessApi'
+import { useImmediateUpload } from '../utils/immediateUpload'
 import { syncTierShopItems, tierPricesFromShopItems, validateTierPrices } from '../utils/shopItemTiers'
 
 const deities = ref([])
 const mockDeities = getInitialData('deityOfferings')
 const descriptionsByName = new Map(mockDeities.map(({ name, description }) => [name, description]))
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const formLoading = ref(false)
 const deletingId = ref(null)
-const selectedImageFile = ref(null)
 const localPreviewUrl = ref('')
+const { uploading, uploadFile, runUpload } = useImmediateUpload()
+let uploadToken = 0
 const editVisible = ref(false)
 const mode = ref('create')
 const currentDeity = ref(null)
@@ -65,9 +67,9 @@ function getList(payload) {
 }
 
 function clearLocalPreview() {
+  uploadToken += 1
   if (localPreviewUrl.value) URL.revokeObjectURL(localPreviewUrl.value)
   localPreviewUrl.value = ''
-  selectedImageFile.value = null
 }
 
 function resetForm() {
@@ -154,14 +156,29 @@ async function openEdit(deity) {
   }
 }
 
-function onImageChange(event) {
+// 选中图片立即上传：form.image 始终是服务端 URL，本地 blob 仅用于上传期间预览。
+async function onImageChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
+  const previousImage = form.image
   clearLocalPreview()
-  selectedImageFile.value = file
+  const token = uploadToken
   localPreviewUrl.value = URL.createObjectURL(file)
-  form.image = localPreviewUrl.value
+
+  await runUpload(async () => {
+    try {
+      const url = await uploadFile(file, '图片')
+      if (token !== uploadToken) return
+      form.image = url
+      ElMessage.success('图片上传成功')
+    } catch (error) {
+      if (token !== uploadToken) return
+      clearLocalPreview()
+      form.image = previousImage
+      ElMessage.error(error.userMessage || error.message || '图片上传失败')
+    }
+  })
 }
 
 async function loadDeities() {
@@ -190,7 +207,7 @@ async function loadDeities() {
 }
 
 async function submitDeity() {
-  if (saving.value) return
+  if (uploading.value || !allowSubmit()) return
   // 除「分类」外其余字段均必填；标签为一组，至少填写一个；四档金额由 validateTierPrices 校验。
   const requiredFields = [
     { key: 'image', label: '神像图' },
@@ -218,7 +235,6 @@ async function submitDeity() {
   saving.value = true
   const isEdit = mode.value === 'edit'
   const deityId = currentDeity.value?.id
-  const imageFile = selectedImageFile.value
   const matchGod = form.matchGod.trim()
   const payload = {
     matchGod,
@@ -231,13 +247,7 @@ async function submitDeity() {
     tag: tagFields.map((key) => form[key].trim()).filter(Boolean).join(','),
   }
   try {
-    let picture = form.image
-    if (imageFile) {
-      const uploadedFile = await uploadBusinessFile(imageFile)
-      picture = uploadedFile?.url
-      if (!picture) throw new Error('图片上传成功但未返回图片地址')
-    }
-    const finalPicture = picture || ''
+    const finalPicture = form.image || ''
 
     // 四档金额先落成四条捐钱类商品（已有的改价格，缺的新建），再把商品 id 写入供奉配置。
     const shopItemsIds = await syncTierShopItems({
@@ -266,7 +276,7 @@ async function submitDeity() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '供奉信息保存失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 
@@ -318,21 +328,22 @@ onMounted(loadDeities)
       v-model="editVisible"
       :title="mode === 'edit' ? '编辑供奉配置' : '新增供奉配置'"
       width="520px"
-      :close-on-click-modal="!saving"
-      :close-on-press-escape="!saving"
-      :show-close="!saving"
+      :close-on-click-modal="!saving && !uploading"
+      :close-on-press-escape="!saving && !uploading"
+      :show-close="!saving && !uploading"
       @closed="clearLocalPreview"
     >
       <el-form v-loading="formLoading" class="deity-form" label-position="top" @submit.prevent>
         <el-form-item label="神像图" required>
           <label class="upload-box">
-            <input type="file" accept="image/*" @change="onImageChange" />
-            <img v-if="form.image" :src="form.image" class="upload-preview" alt="神像图预览" />
+            <input type="file" accept="image/*" :disabled="uploading || saving" @change="onImageChange" />
+            <img v-if="localPreviewUrl || form.image" :src="localPreviewUrl || form.image" class="upload-preview" alt="神像图预览" />
             <template v-else>
               <span class="upload-icon">＋</span>
               <strong>点击上传神像图</strong>
               <span class="upload-tip">仅限 1 张 · 建议尺寸 400 × 400</span>
             </template>
+            <span v-if="uploading" class="upload-mask">上传中…</span>
           </label>
         </el-form-item>
 
@@ -379,8 +390,8 @@ onMounted(loadDeities)
       </el-form>
 
       <template #footer>
-        <el-button :disabled="saving" @click="editVisible = false">取消</el-button>
-        <el-button class="save-button" :loading="saving" :disabled="formLoading" @click="submitDeity">提交</el-button>
+        <el-button :disabled="uploading || saving" @click="editVisible = false">取消</el-button>
+        <el-button class="save-button" :loading="saving" :disabled="uploading || formLoading" @click="submitDeity">提交</el-button>
       </template>
     </el-dialog>
   </main>

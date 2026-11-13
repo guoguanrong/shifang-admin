@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useSubmitGuard } from '../utils/submitGuard'
+import { reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -7,7 +8,7 @@ import { useAuthStore } from '../stores/auth'
 const authStore = useAuthStore()
 const route = useRoute()
 const router = useRouter()
-const loading = ref(false)
+const { saving: loading, allowSubmit, endSubmit } = useSubmitGuard()
 const form = reactive({
   username: '',
   password: '',
@@ -23,6 +24,7 @@ async function submitLogin() {
     return
   }
 
+  if (!allowSubmit()) return
   loading.value = true
   try {
     await authStore.login({ ...form, username: form.username.trim() })
@@ -33,7 +35,7 @@ async function submitLogin() {
   } catch (error) {
     ElMessage.error(error.message)
   } finally {
-    loading.value = false
+    endSubmit()
   }
 }
 

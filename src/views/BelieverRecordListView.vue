@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RecordFilterBar from '../components/record/RecordFilterBar.vue'
@@ -17,7 +18,7 @@ const filters = ref(createBelieverRecordFilters())
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const detailLoading = ref(false)
 
 function toBoolean(value) {
@@ -190,6 +191,7 @@ async function openEdit(row) {
 }
 
 async function submitRecord() {
+  if (!allowSubmit()) return
   if (!form.name.trim()) {
     ElMessage.warning('请输入信众名称')
     return
@@ -227,7 +229,7 @@ async function submitRecord() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存实录失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 </script>

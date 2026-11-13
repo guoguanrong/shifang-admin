@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ActivityFilterBar from '../components/activity/ActivityFilterBar.vue'
@@ -15,7 +16,7 @@ const filters = ref(createActivityFilters())
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 
 function getList(payload) {
   const result = payload?.data ?? payload
@@ -159,7 +160,7 @@ function openEdit(activity) {
 // 弹窗保存：页面模型转成接口入参后提交（新增 /activity/save，编辑 /activity/update），
 // 成功后刷新列表；报名状态与上架状态均由弹窗带入。
 async function handleSave(payload) {
-  if (saving.value) return
+  if (!allowSubmit()) return
   saving.value = true
   const isEdit = Boolean(editingId.value)
   const body = buildActivityPayload(payload)
@@ -196,7 +197,7 @@ async function handleSave(payload) {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存道会失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 </script>

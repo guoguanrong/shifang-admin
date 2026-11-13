@@ -1,4 +1,5 @@
 <script setup>
+import { useSubmitGuard } from '../utils/submitGuard'
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import DonationItemFilterBar from '../components/donation/DonationItemFilterBar.vue'
@@ -9,8 +10,8 @@ import {
   getShopItemsList,
   saveShopItems,
   updateShopItems,
-  uploadBusinessFile,
 } from '../services/businessApi'
+import { useImmediateUpload } from '../utils/immediateUpload'
 
 const PAGE_SIZE = 10
 
@@ -19,12 +20,13 @@ const filters = ref({ name: '', status: '' })
 const currentPage = ref(1)
 const total = ref(0)
 const loading = ref(false)
-const saving = ref(false)
+const { saving, allowSubmit, endSubmit } = useSubmitGuard()
 const dialogVisible = ref(false)
 const formRef = ref()
 const editingId = ref(null)
-const selectedImageFile = ref(null)
 const localPreviewUrl = ref('')
+const { uploading, uploadFile, runUpload } = useImmediateUpload()
+let uploadToken = 0
 const form = reactive({
   name: '',
   usage: '',
@@ -106,9 +108,9 @@ function changePage(page) {
 }
 
 function clearLocalPreview() {
+  uploadToken += 1
   if (localPreviewUrl.value) URL.revokeObjectURL(localPreviewUrl.value)
   localPreviewUrl.value = ''
-  selectedImageFile.value = null
 }
 
 function resetForm() {
@@ -153,14 +155,29 @@ async function openEdit(item) {
   }
 }
 
-function onImageChange(event) {
+// 选中图片立即上传：form.image 始终是服务端 URL，本地 blob 仅用于上传期间预览。
+async function onImageChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
+  const previousImage = form.image
   clearLocalPreview()
-  selectedImageFile.value = file
+  const token = uploadToken
   localPreviewUrl.value = URL.createObjectURL(file)
-  form.image = localPreviewUrl.value
+
+  await runUpload(async () => {
+    try {
+      const url = await uploadFile(file, '图片')
+      if (token !== uploadToken) return
+      form.image = url
+      ElMessage.success('图片上传成功')
+    } catch (error) {
+      if (token !== uploadToken) return
+      clearLocalPreview()
+      form.image = previousImage
+      ElMessage.error(error.userMessage || error.message || '图片上传失败')
+    }
+  })
 }
 
 function validatePrice(_rule, value, callback) {
@@ -194,7 +211,7 @@ function makePayload(picture) {
 }
 
 async function submitItem() {
-  if (saving.value) return
+  if (uploading.value || !allowSubmit()) return
   try {
     await formRef.value.validate()
   } catch {
@@ -202,13 +219,7 @@ async function submitItem() {
   }
   saving.value = true
   try {
-    let picture = form.image
-    if (selectedImageFile.value) {
-      const uploadedFile = await uploadBusinessFile(selectedImageFile.value)
-      picture = uploadedFile?.url
-      if (!picture) throw new Error('图片上传成功但未返回图片地址')
-    }
-    const payload = makePayload(picture)
+    const payload = makePayload(form.image)
     if (editingId.value) await updateShopItems({ id: editingId.value, ...payload })
     else await saveShopItems(payload)
     dialogVisible.value = false
@@ -218,7 +229,7 @@ async function submitItem() {
   } catch (error) {
     ElMessage.error(error.userMessage || error.message || '保存捐赠物品失败')
   } finally {
-    saving.value = false
+    endSubmit()
   }
 }
 
@@ -292,18 +303,19 @@ onMounted(loadItems)
       />
     </section>
 
-    <el-dialog v-model="dialogVisible" title="新增/编辑" width="520px">
+    <el-dialog v-model="dialogVisible" title="新增/编辑" width="520px" @closed="clearLocalPreview">
       <el-form ref="formRef" class="item-form" :model="form" :rules="rules" label-position="top">
-        <!-- 物品图片：单张本地预览 -->
+        <!-- 物品图片：选中即上传，本地 blob 仅用于即时预览 -->
         <el-form-item label="物品图片">
           <label class="upload-box">
-            <input type="file" accept="image/*" @change="onImageChange" />
-            <img v-if="form.image" :src="form.image" class="upload-preview" alt="物品图片预览" />
+            <input type="file" accept="image/*" :disabled="uploading || saving" @change="onImageChange" />
+            <img v-if="localPreviewUrl || form.image" :src="localPreviewUrl || form.image" class="upload-preview" alt="物品图片预览" />
             <template v-else>
               <span class="upload-icon">⬆</span>
               <strong>点击上传物品图片</strong>
               <span class="upload-tip">仅限 1 张 · 建议尺寸 400 × 400</span>
             </template>
+            <span v-if="uploading" class="upload-mask">上传中…</span>
           </label>
         </el-form-item>
         <el-form-item label="物品名称" prop="name">
@@ -339,8 +351,8 @@ onMounted(loadItems)
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button class="save-button" :loading="saving" @click="submitItem">提交</el-button>
+        <el-button :disabled="uploading || saving" @click="dialogVisible = false">取消</el-button>
+        <el-button class="save-button" :loading="saving" :disabled="uploading" @click="submitItem">提交</el-button>
       </template>
     </el-dialog>
   </main>
